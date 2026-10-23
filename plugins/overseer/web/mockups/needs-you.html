@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overseer board, two decisions wait</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#1a1d23}
+a{color:#ada3d3}a:hover{color:#cfc8ea}
+.k{font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ad}
+.mono{font-family:'IBM Plex Mono',monospace}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ad;padding:0 12px 8px 0}
+td{padding:10px 12px 10px 0;border-top:1px solid #2f343d;vertical-align:baseline}
+summary{cursor:pointer;list-style:none;display:flex;gap:12px;align-items:baseline;padding:12px 0}
+summary::-webkit-details-marker{display:none}
+summary::before{content:'▸';color:#9aa1ad;font-family:'IBM Plex Mono',monospace}
+details[open] summary::before{content:'▾'}
+dl{margin:0;display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px}
+dt{font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ad;padding-top:3px}
+dd{margin:0}
+</style>
+</helmet>
+<div style="background: #1a1d23; color: #dfe2e7; font: 15px/1.5 'IBM Plex Sans', system-ui, sans-serif; min-height: 1400px; box-sizing: border-box; padding: 32px 20px 56px">
+<div style="max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px">
+
+<header style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; align-items: center; gap: 12px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ada3d3" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+<span class="mono" style="font-weight: 600; letter-spacing: .12em; color: #ada3d3; font-size: 13px">OVERSEER</span>
+<span style="color: #9aa1ad">Fleet alerts v2</span>
+</div>
+<span class="mono" style="font-size: 12px; color: #98c5a0; border: 1px solid #3c4a40; border-radius: 99px; padding: 3px 10px">● live · next pass 14:32</span>
+</header>
+
+<section style="display: flex; flex-direction: column; gap: 16px">
+<span class="k" style="color: #dc8c81">2 decisions wait on you</span>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px">
+
+<article style="background: #2a2224; border: 1px solid #5a3b38; border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+<span class="mono" style="font-size: 13px; color: #b4bac4">1 · worker-8f · lot 2 Escort route</span>
+<span class="mono" style="font-size: 13px; color: #dc8c81">waited 6m00</span>
+</div>
+<p style="margin: 0; font-size: 21px; line-height: 1.3; font-weight: 500">“Keep the legacy route endpoint?”</p>
+<dl>
+<dt>Recommends</dt><dd>Keep it behind a flag: the mobile app still calls it.</dd>
+<dt>Blocks</dt><dd>lot 4 Mobile banner, lot 7 Data export</dd>
+</dl>
+<span class="mono" style="font-size: 12px; color: #9aa1ad">Answer in worker-8f</span>
+</article>
+
+<article style="background: #2a2224; border: 1px solid #5a3b38; border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+<span class="mono" style="font-size: 13px; color: #b4bac4">2 · lot 7 Data export · blocked</span>
+<span class="mono" style="font-size: 13px; color: #dc8c81">since 14 min</span>
+</div>
+<p style="margin: 0; font-size: 21px; line-height: 1.3; font-weight: 500">Needs read access to the staging database.</p>
+<dl>
+<dt>Blocks</dt><dd>nothing else</dd>
+</dl>
+<span class="mono" style="font-size: 12px; color: #9aa1ad">Unblock it, then set lot 7 back to [ ] in PLAN.md</span>
+</article>
+
+</div>
+<p style="margin: 0; color: #dcc188; font-size: 14px"><span class="mono">Then ·</span> look at worker-a1: a tool call has waited 11 min, maybe a permission prompt.</p>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 8px; border: 1px solid #4a4434; background: #25241f; border-radius: 12px; padding: 16px 20px">
+<span class="k" style="color: #dcc188">At risk if you close everything now</span>
+<span>worker-8f: 5 uncommitted files in the lot-2 worktree</span>
+<span>design-review workflow: 3 agents still running</span>
+<span style="color: #9aa1ad; font-size: 13px">Local commits are safe: closing a session keeps its branch.</span>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px" role="img" aria-label="4 lots done, 2 running, 2 to do, 1 blocked">
+<div style="flex: 4; background: #98c5a0"></div>
+<div style="flex: 2; background: #dcc188"></div>
+<div style="flex: 2; background: #343a44"></div>
+<div style="flex: 1; background: #dc8c81"></div>
+</div>
+<div class="mono" style="display: flex; gap: 20px; font-size: 12px; color: #9aa1ad; flex-wrap: wrap">
+<span><span style="color: #98c5a0">✓ 4</span> done</span>
+<span><span style="color: #dcc188">◐ 2</span> running</span>
+<span>○ 2 to do</span>
+<span><span style="color: #dc8c81">! 1</span> blocked</span>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<span class="k">Lots</span>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th style="width: 28px"></th><th>Lot</th><th>On it</th><th>Done when</th><th style="text-align: right">State</th></tr></thead>
+<tbody>
+<tr><td class="mono" style="color: #dcc188">◐</td><td>2 · Escort route</td><td style="color: #b4bac4">worker-8f</td><td style="color: #9aa1ad">escort.spec passes</td><td class="mono" style="text-align: right; color: #dc8c81; font-size: 13px">waits · decision 1</td></tr>
+<tr><td class="mono" style="color: #dcc188">◐</td><td>5 · Fleet digest</td><td style="color: #b4bac4">worker-a1</td><td style="color: #9aa1ad">digest renders for 3 fleets</td><td class="mono" style="text-align: right; color: #dcc188; font-size: 13px">tool call 11m</td></tr>
+<tr><td class="mono" style="color: #dc8c81">!</td><td>7 · Data export</td><td style="color: #9aa1ad">—</td><td style="color: #9aa1ad">CSV of 30 days of alerts</td><td class="mono" style="text-align: right; color: #dc8c81; font-size: 13px">blocked · decision 2</td></tr>
+<tr><td class="mono" style="color: #9aa1ad">○</td><td>4 · Mobile banner</td><td style="color: #9aa1ad">—</td><td style="color: #9aa1ad">banner shows on iOS and Android</td><td class="mono" style="text-align: right; color: #9aa1ad; font-size: 13px">after lot 2</td></tr>
+</tbody>
+</table>
+</div>
+<details open="">
+<summary><span style="color: #98c5a0">✓ 4 done</span><span style="color: #9aa1ad">Alert model, Webhook retry, Schema v2, Seed data</span></summary>
+<div style="display: flex; flex-direction: column; gap: 0; padding-left: 22px">
+<div style="display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 6px 16px; padding: 12px 0; border-top: 1px solid #2f343d">
+<span>3 · Webhook retry</span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span>Retries back off up to 5 min, and webhook.retry.spec passes.</span>
+<span class="mono" style="font-size: 12px; color: #9aa1ad">judged done 14:21 · check <span style="color: #98c5a0">npm test -- webhook ✓</span> · 3 files</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 6px 16px; padding: 12px 0; border-top: 1px solid #2f343d">
+<span>1 · Alert model</span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span>Alert table and types in place; the migration runs on a copy of prod.</span>
+<span class="mono" style="font-size: 12px; color: #9aa1ad">judged done 11:52 · second try</span>
+</div>
+</div>
+</div>
+</details>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<span class="k">Sessions</span>
+<div class="mono" style="display: flex; gap: 28px; flex-wrap: wrap; font-size: 14px">
+<span><span style="color: #dc8c81">?</span> worker-8f <span style="color: #9aa1ad">→ decision 1</span></span>
+<span><span style="color: #dcc188">◍</span> worker-a1 <span style="color: #9aa1ad">lot 5 · tool call 11m</span></span>
+<span><span style="color: #9aa1ad">○</span> worker-c3 <span style="color: #9aa1ad">free</span></span>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; border-top: 1px solid #2f343d">
+<details style="border-bottom: 1px solid #2f343d"><summary><span class="k" style="width: 110px">Branches</span><span style="color: #b4bac4">3 ahead of main · no conflict · 1 worktree with 5 uncommitted files</span></summary></details>
+<details style="border-bottom: 1px solid #2f343d"><summary><span class="k" style="width: 110px">Lots graph</span><span style="color: #b4bac4">9 lots, one lane per session</span></summary></details>
+<details style="border-bottom: 1px solid #2f343d"><summary><span class="k" style="width: 110px">Workflows</span><span style="color: #b4bac4">1 running · design-review 4/7</span></summary></details>
+<details style="border-bottom: 1px solid #2f343d"><summary><span class="k" style="width: 110px">Decisions</span><span style="color: #b4bac4">2 this run · last: keep CSV export, 11:40</span></summary></details>
+<details style="border-bottom: 1px solid #2f343d"><summary><span class="k" style="width: 110px">Log</span><span class="mono" style="color: #9aa1ad; font-size: 13px">14:26 blocked → lot 7 · 14:21 done → lot 3</span></summary></details>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1400}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

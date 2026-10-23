@@ -1,0 +1,28 @@
+{
+  "name": "overseer",
+  "owner": { "name": "Victor Grosjean" },
+  "metadata": {
+    "description": "Overseer: run a PLAN.md through your Claude sessions, with a human-approved gate for Workflow runs.",
+    "version": "0.4.2"
+  },
+  "plugins": [
+    {
+      "name": "overseer",
+      "source": "./plugins/overseer",
+      "description": "/oversee runs the project's PLAN.md through the Claude sessions you pick: tasks, judging, weekly-limit budget, answers, nudges.",
+      "version": "0.4.2",
+      "author": { "name": "Victor Grosjean" },
+      "category": "development",
+      "keywords": ["plan", "sessions", "board", "overseer"]
+    },
+    {
+      "name": "workflow-gate",
+      "source": "./plugins/workflow-gate",
+      "description": "Requires a human-approved plan before Claude Code's Workflow tool runs, plus the workflow-orchestration-patterns skill.",
+      "version": "1.9.0",
+      "author": { "name": "Victor Grosjean" },
+      "category": "development",
+      "keywords": ["workflow", "multi-agent", "cost-control", "review-gate"]
+    }
+  ]
+}

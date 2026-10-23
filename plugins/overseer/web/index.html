@@ -1,0 +1,1136 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="__THEME_LIGHT__">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="__THEME_DARK__">
+<meta name="apple-mobile-web-app-capable" content="yes"> <!-- lot 69: the board opens full screen from the home screen -->
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!--
+  The overseer board, v3 (overseer/web/CONTRACT.md says where each thing comes from; mockups/board-v3.html is the reference).
+  Two views: Overview (#view-cockpit) and Review (#view-review). Lean only. The page reads /board/<slug> and /events/<slug>, and
+  shows "Not exported yet" for a field the board does not carry: never sample data. The CSS is board.css (the mockup's, with the
+  fixes of DESIGN.md section 7); the stages of the lot pane load from stages/*.js and the git tree from gittree.js.
+-->
+<title>Overseer board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/board.css">
+<style>
+/* Page-only rules (state of a write control, a board that is silent, a disabled board): DESIGN.md tokens, type steps and radii only. */
+.w-state{font:12px var(--mono);color:var(--ink-2);margin-left:6px;white-space:nowrap}
+.w-state.refused{color:var(--act)}
+[data-w][disabled],button[disabled]{opacity:.4;cursor:default}
+.pj-menu .stale{color:var(--ink-3)}
+.pj-notify{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px;border-top:1px solid var(--line);font:13px var(--sans);color:var(--ink-2)}
+.pj-notify label{display:flex;gap:6px;align-items:center}
+.pj-notify input[type=time]{font:inherit;color:var(--ink);background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
+.pj-notify #notify-btn{display:inline-block;width:auto;padding:6px 10px;border:1px solid var(--line);background:var(--raised);color:var(--ink)}
+.pj-menu .stale b{font-weight:400}
+.hud-bar.pace{gap:0;background:var(--line);border-radius:3px;overflow:hidden}.hud-bar.pace i{flex:none;border-radius:0;background:var(--done)}.hud-bar.pace.long i{background:var(--act)}
+.ck-hud .hud-kv small,.ck-hud .hud-h{white-space:nowrap}
+.ck-top .stat.off .dot{background:var(--watch)}
+.ck-banner{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:8px;background:var(--act-soft);color:var(--ink);font-size:13px}
+.nx{color:var(--ink-3);font-style:italic}
+.cr-item.sent small,.cr-item.done small{color:var(--ink-2)}
+.ck.lean .rail-notes{display:flex} /* v1 features have a place (CONTRACT.md): what closing now would lose, the last decision */
+.ck.list-off .ck-main{grid-column:2} /* the list is out of the grid: the lot pane must not fall into its column */
+/* ---- the phone (lot 67): below 600 px wide, or under 480 px high, the page is mockups/phone (Main, NeedCard, GateCard, Tasks,
+   TaskDetail, Activity). One scroll area, the document; a sticky one-row bar; a bottom tab bar over the home indicator. */
+#phone{display:none}
+html.phone .page > .views, html.phone #view-review, html.phone #view-cockpit{display:none!important}
+html.phone kbd{display:none}
+html.phone body{margin:0;overflow:auto!important;overflow-x:hidden!important}
+html.phone .page{padding:0;gap:0;height:0;min-height:0;overflow:hidden} /* only the icon sprite stays, for the phone's icons */
+html.phone #phone{display:block;min-height:100vh;background:var(--ground);color:var(--ink);padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.pp button,.pp a{-webkit-tap-highlight-color:transparent}
+.pp-top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;height:56px;max-height:56px;padding:0 12px 0 16px;box-sizing:border-box;background:var(--ground);border-bottom:1px solid var(--line)}
+.pp-pj{all:unset;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600;letter-spacing:-.01em;min-height:44px;min-width:44px;max-width:52vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp-live{all:unset;cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--raised);border-radius:999px;padding:0 12px;min-height:44px;box-sizing:border-box;font-size:13px;color:var(--ink-2)}
+.pp-live .dot{width:8px;height:8px;border-radius:999px;background:var(--done)}.pp-live.off .dot{background:var(--watch)}
+.pp-live svg{width:18px;height:18px;transform:rotate(-90deg)}.pp-live circle{fill:none;stroke-width:3}.pp-live .trk{stroke:var(--line)}.pp-live .arc{stroke:var(--ink-2)}
+.pp-scr{padding:18px 16px 8px}
+.pp-h1{font-size:28px;line-height:1.25;font-weight:500;letter-spacing:-.02em;margin:0}
+.pp-sub{font-size:13px;color:var(--ink-3);margin:2px 0 16px}
+.pp-list{display:flex;flex-direction:column;gap:10px}
+.pp-sw{position:relative;border-radius:16px;overflow:hidden;background:var(--raised);touch-action:pan-y}
+.pp-row{all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--ground);min-height:44px;position:relative;z-index:1;transition:transform .18s}
+.pp-sw.open .pp-row{transform:translateX(-216px)}
+.pp-ico{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--raised);color:var(--ink-2)}.pp-ico.act{background:var(--act-soft);color:var(--act)}
+.pp-ico .sico{width:18px;height:18px}
+.pp-kind{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+.pp-what{display:block;font-size:14px;line-height:1.4;font-weight:500;margin:2px 0 4px}
+.pp-meta{font-size:13px;color:var(--ink-2)}
+.pp-age{margin-left:auto;font:12px var(--mono);color:var(--ink-3);flex:none}
+.pp-tag{display:inline-block;font-size:11.5px;padding:0 6px;border-radius:999px;background:var(--watch-soft);color:var(--ink-2);margin-left:6px;vertical-align:1px}
+.pp-snz{position:absolute;right:0;top:0;bottom:0;display:flex}
+.pp-snz button{all:unset;cursor:pointer;width:72px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--ink);background:var(--watch-soft);border-left:1px solid var(--line)}
+.pp-snz b{font-weight:600;font-size:13px}
+.pp-later{margin-top:18px;display:flex;align-items:center;gap:8px;padding:12px 4px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+.pp-toast{position:fixed;left:16px;right:16px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--ground);border-radius:12px;padding:6px 6px 6px 16px;font-size:14px}
+.pp-toast button{all:unset;cursor:pointer;margin-left:auto;font-weight:600;min-height:44px;min-width:44px;padding:0 12px;display:flex;align-items:center}
+.pp-tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;border-top:1px solid var(--line);background:var(--ground);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.pp-tab{all:unset;cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;color:var(--ink-3);font-size:12px;position:relative}
+.pp-tab[aria-current="page"]{color:var(--ink)}
+.pp-tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+.pp-badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:999px;background:var(--act);color:var(--on-act,var(--ground));font-size:11.5px;font-weight:600;display:grid;place-items:center;padding:0 4px;box-sizing:border-box}
+.pp-sheet{margin:0 16px 12px;padding:12px 14px;border-radius:12px;background:var(--raised);font-size:14px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px}
+.pp-sheet b{color:var(--ink);font-weight:500}
+.pp-sheet > button{all:unset;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;color:var(--ink)}
+.pp-run{all:unset;cursor:pointer;display:flex;gap:16px;align-items:center;padding:10px 14px;border-radius:12px;background:var(--raised);font-size:13px;color:var(--ink-2);min-height:44px;box-sizing:border-box;width:100%;margin-bottom:14px}
+.pp-run b{color:var(--ink);font-weight:500}
+.pp-meter{width:56px;height:6px;border-radius:999px;background:var(--line);overflow:hidden}.pp-meter i{display:block;height:100%;background:var(--ink-2)}
+.pp-sec{display:flex;align-items:baseline;justify-content:space-between;font-size:13px;font-weight:600;margin:14px 0 8px}.pp-sec span{font-weight:400;color:var(--ink-3)}
+.pp-prop{border:1px dashed var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--ink-2)}
+.pp-btn{all:unset;cursor:pointer;box-sizing:border-box;flex:1;min-height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);font-weight:500;color:var(--ink);font-size:14px;padding:0 12px}
+.pp-btn.go{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.pp-btn.act{background:var(--act);color:var(--on-act,var(--ground));border-color:var(--act)}
+.pp-card{all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid var(--line);border-radius:16px;color:var(--ink);margin-bottom:10px;min-height:44px}
+.pp-l1{display:flex;align-items:baseline;gap:8px}.pp-n{font-size:13px;color:var(--ink-3)}.pp-ttl{font-weight:500;line-height:1.35}
+.pp-l2{display:flex;gap:10px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.pp-bar{height:4px;border-radius:999px;background:var(--line);position:relative;margin-top:4px}
+.pp-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--accent)}.pp-bar.long i{background:var(--act)}
+.pp-bar b{position:absolute;top:-3px;width:2px;height:10px;background:var(--ink-3)}
+.pp-fold{border-top:1px solid var(--line)}
+.pp-fold > summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:44px;font-size:14px;color:var(--ink-2)}
+.pp-fold > summary::-webkit-details-marker{display:none}
+.pp-mini{all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;gap:8px;align-items:center;min-height:44px;border-top:1px solid var(--line);font-size:14px}
+.pp-mini .pp-n{flex:none;width:28px}
+.pp-back{all:unset;cursor:pointer;display:flex;align-items:center;gap:2px;min-height:44px;min-width:44px;padding:0 8px;color:var(--ink-2);font-size:14px}
+.pp-head{position:sticky;top:56px;z-index:4;display:flex;align-items:center;background:var(--ground);padding:0 8px}
+.pp-pos{margin-left:auto;display:flex;gap:4px;align-items:center;padding-right:10px}.pp-pos i{width:6px;height:6px;border-radius:999px;background:var(--line)}.pp-pos i.on{width:18px;background:var(--ink)}
+.pp-body{padding:4px 16px 12px;display:flex;flex-direction:column;gap:12px}
+.pp-eye{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+.pp-q{font-size:22px;line-height:1.3;font-weight:500;letter-spacing:-.02em;margin:0}
+.pp-t{font-size:22px;line-height:1.25;font-weight:500;letter-spacing:-.02em;margin:0}
+.pp-ctx{background:var(--raised);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink-2)}.pp-ctx b{color:var(--ink);font-weight:500}
+.pp-cardscr{touch-action:pan-y;display:flex;flex-direction:column;min-height:calc(100dvh - 56px - 64px - env(safe-area-inset-bottom))}.pp-cardscr > .pp-body{flex:1}
+/* a phone held sideways: too short for the card above its dock, so the dock goes beside it, still at the bottom of the screen */
+@media (max-height: 480px) and (max-width: 932px){.pp-cardscr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr}.pp-cardscr > .pp-head{grid-column:1/-1}.pp-cardscr > .pp-dock{align-self:end;border-top:0}}
+.pp-dock{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));z-index:4;border-top:1px solid var(--line);padding:12px 16px;display:flex;flex-direction:column;gap:8px;background:var(--ground)}
+.pp-opt{all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:10px;min-height:52px;padding:0 16px;border-radius:12px;border:1px solid var(--line);font-size:14px;font-weight:500}
+.pp-opt.rec{background:var(--act);color:var(--on-act,var(--ground));border-color:var(--act)}
+.pp-opt small{margin-left:auto;font-size:12px;font-weight:500;opacity:.9}
+.pp-reply{display:flex;gap:8px;align-items:stretch}
+.pp-reply input,.pp-reply textarea{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--ground);color:var(--ink);padding:0 14px;font:inherit;box-sizing:border-box}
+.pp-reply textarea{padding:10px 14px;min-height:88px;resize:none}
+.pp-send{all:unset;cursor:pointer;width:48px;min-height:48px;border-radius:12px;background:var(--raised);display:grid;place-items:center;color:var(--ink-2)}
+.pp-row3{display:flex;gap:8px}
+.pp-props{display:flex;flex-direction:column;gap:12px}.pp-prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.pp-ptitle{flex:1;min-width:0;font-size:14px}.pp-prow .pp-row3{flex-basis:100%}
+.pp-x{all:unset;cursor:pointer;box-sizing:border-box;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--ink-2)}
+.w-x{cursor:pointer;margin-left:6px;padding:0 4px;color:var(--ink-2)}.w-x:hover{color:var(--ink)}
+.pp-st{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 16px;border-radius:12px;background:var(--raised);font-size:14px}
+.pp-st .d{width:10px;height:10px;border-radius:999px;background:var(--watch)}.pp-st.done .d{background:var(--done)}.pp-st.refused .d{background:var(--act)}
+.pp-steps{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px}
+.pp-s{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line);min-height:44px;box-sizing:border-box}.pp-s:first-child{border-top:0}
+.pp-s .m{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--raised);color:var(--ink-2)}
+.pp-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pp-k{background:var(--raised);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.pp-k b{font-family:var(--mono);font-weight:500;font-size:16px}.pp-k span{font-size:12px;color:var(--ink-2)}
+.pp-segs{display:flex;gap:2px;margin-top:4px}.pp-segs i{flex:1;height:4px;border-radius:3px;background:var(--line)}.pp-segs i.met{background:var(--done)}.pp-segs i.gap{background:var(--act)}
+.pp-crit{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}.pp-crit li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);font-size:14px}.pp-crit .sico{flex:none;width:18px;height:18px;margin-top:2px}
+.pp-segctl{display:flex;background:var(--raised);border-radius:999px;padding:4px}
+.pp-tx{all:unset;cursor:pointer;flex:1;text-align:center;min-height:44px;border-radius:999px;font-size:14px;color:var(--ink-2);display:grid;place-items:center}
+.pp-tx[aria-pressed="true"]{background:var(--ground);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.pp-stage .diff,.pp-stage .dv-diff{max-width:100%;overflow-x:auto}
+.pp-stage .dl{overflow-x:visible}
+.pp-stage .dv-files{grid-template-columns:auto auto minmax(0,1fr)}
+.pp-stage button,.pp-stage summary{min-height:44px}
+.pp-chips{display:flex;gap:6px;margin:10px 0 8px;flex-wrap:wrap}
+.pp-chip{all:unset;cursor:pointer;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line);font-size:13px;color:var(--ink-2);display:grid;place-items:center}
+.pp-chip[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.pp-day{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin:12px 0 2px}
+.pp-e{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.pp-e .k{flex:none;width:8px;height:8px;border-radius:999px;margin-top:8px;background:var(--ink-3)}.pp-e .k.done{background:var(--done)}.pp-e .k.act{background:var(--act)}.pp-e .k.you{background:var(--accent)}
+.pp-e .w{font-size:14px;line-height:1.45}.pp-e .m{font:12px var(--mono);color:var(--ink-3)}
+.pp-empty{padding:28px 4px;color:var(--ink-2);font-size:14px}
+</style>
+
+<div class="page">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-think" viewBox="0 0 16 16"><path d="M8 1.8a4.2 4.2 0 0 0-2.5 7.6c.4.3.6.8.6 1.2v.9h3.8v-.9c0-.4.2-.9.6-1.2A4.2 4.2 0 0 0 8 1.8z"/><path d="M6.3 13.6h3.4"/></symbol>
+  <symbol id="i-build" viewBox="0 0 16 16"><path d="M5.5 4.5 2 8l3.5 3.5"/><path d="M10.5 4.5 14 8l-3.5 3.5"/><path d="M9 3 7 13"/></symbol>
+  <symbol id="i-test" viewBox="0 0 16 16"><path d="M6 1.8h4"/><path d="M6.8 1.8v4L3.2 12.4A1.2 1.2 0 0 0 4.3 14h7.4a1.2 1.2 0 0 0 1.1-1.6L9.2 5.8v-4"/><path d="M4.6 10h6.8"/></symbol>
+  <symbol id="i-verify" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6"/><path d="m10.4 10.4 3.6 3.6"/><path d="m5 7 1.4 1.4L9 5.8"/></symbol>
+  <symbol id="i-gate" viewBox="0 0 16 16"><path d="M8 1.8 14.2 8 8 14.2 1.8 8z"/><path d="M8 5.6v3"/><path d="M8 10.6v.1"/></symbol>
+  <symbol id="i-fix" viewBox="0 0 16 16"><path d="M10.2 2.2a3.4 3.4 0 0 0-3.9 4.5L2.2 10.8a1.4 1.4 0 0 0 2 2l4.1-4.1a3.4 3.4 0 0 0 4.5-3.9l-2 2-1.8-.3-.3-1.8z"/></symbol>
+  <symbol id="i-commit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M1.5 8h3.7"/><path d="M10.8 8h3.7"/></symbol>
+  <symbol id="i-loop" viewBox="0 0 16 16"><path d="M13.2 6.2A5.4 5.4 0 0 0 3.4 4.8"/><path d="M3.2 2.2v2.8H6"/><path d="M2.8 9.8a5.4 5.4 0 0 0 9.8 1.4"/><path d="M12.8 13.8V11H10"/></symbol>
+  <symbol id="i-par" viewBox="0 0 16 16"><path d="M2 8h3"/><path d="M5 8c2 0 2-4.5 4-4.5h5"/><path d="M5 8c2 0 2 4.5 4 4.5h5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3"/><path d="M8 11.6v.1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7"/></symbol>
+  <symbol id="i-st-run" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-st-wait" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></symbol>
+  <symbol id="i-st-ready" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-st-todo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3.5 3"/></symbol>
+  <symbol id="i-st-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16v.5"/></symbol>
+  <symbol id="i-st-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="currentColor" stroke="none"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke="var(--ground)"/></symbol>
+</svg>
+
+<nav class="seg views" aria-label="View">
+  <button type="button" data-view="cockpit" aria-pressed="true">Overview</button>
+  <button type="button" data-view="review" aria-pressed="false">Review</button>
+</nav>
+
+<div class="view" id="view-review" hidden>
+  <div class="zen-top">
+    <div><span class="eyebrow">Review</span><h1 class="zen-t">Review <span id="z-pos"></span></h1></div>
+    <div class="zprog" id="z-prog" aria-hidden="true"></div>
+  </div>
+  <div id="z-cards"></div>
+  <article class="zcard zend" id="z-end" hidden>
+    <p class="zq" style="color:var(--ink)">Nothing needs you.</p>
+    <p class="d-why" id="z-next"></p>
+    <div class="zacts"><button type="button" class="rec" id="z-back"><kbd>Esc</kbd>Back to the overview</button></div>
+  </article>
+  <div class="dock" id="z-dock" aria-label="Keys"></div>
+</div>
+
+<div class="ck lean" id="view-cockpit">
+  <header class="ck-top">
+    <div class="pj">
+      <button type="button" class="pj-btn" id="pj-btn" aria-haspopup="menu" aria-expanded="false" title="Switch project (P)"><span class="pj-name" id="pj-name">Overseer</span><svg class="pj-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg><span class="pj-goal" id="pj-goal"></span></button>
+      <div class="pj-menu" id="pj-menu" role="menu" hidden><div id="pj-list"></div>
+        <div class="pj-notify" id="pj-notify" role="group" aria-label="Notifications"><button type="button" id="notify-btn">Notify me</button>
+          <label>From <input type="time" id="quiet-from"></label><label>To <input type="time" id="quiet-to"></label><span class="w-state" id="notify-state" aria-live="polite"></span></div></div>
+    </div>
+    <nav class="ck-nav" aria-label="Page">
+      <div class="seg" role="group" aria-label="View"><button type="button" data-view="cockpit" aria-pressed="true">Overview</button><button type="button" data-view="review" aria-pressed="false">Review</button></div>
+    </nav>
+    <div class="ck-actions">
+      <div class="ck-run" role="group" aria-label="Run">
+        <button type="button" class="stat live" id="ck-live" data-w="run" aria-pressed="false" title=""><span class="dot"></span><span><b id="ck-livel">live</b></span></button>
+        <button type="button" class="stat pass" id="ck-pass" data-w="pass" title="Next pass in this time. Click to pass now." aria-label="Pass now"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle class="arc" id="ck-arc" cx="12" cy="12" r="9" pathLength="100" stroke-dasharray="0 100"/></svg><span><b class="mono" id="ck-left">–</b><small id="ck-passl">next pass</small></span></button>
+      </div>
+      <div class="ck-stats">
+        <span class="stat" id="ck-sessions" title=""><span class="pips" id="ck-pips" aria-hidden="true"></span><span><b class="mono" id="ck-busy">–</b><small>sessions busy</small></span></span>
+        <span class="stat" id="ck-budget" title=""><span class="meter half" aria-hidden="true"><i id="ck-meter" style="width:0"></i></span><span><b class="mono" id="ck-pts">–</b><small id="ck-ptsl">weekly-limit pts</small></span></span>
+      </div>
+      <button type="button" class="ck-review" id="ck-review"><span class="badge" id="ck-count">0</span><span id="ck-review-t">Nothing needs you</span><kbd>Z</kbd><kbd>M</kbd></button>
+    </div>
+  </header>
+
+  <div class="ck-rail" aria-label="Plan and git">
+    <div class="rail-h"><span><b>Plan</b> <span id="ck-lots">–</span><span id="ck-left2"></span><button type="button" class="ck-lt" id="ck-lt" title="[">Hide the list</button><button type="button" class="ck-gt" id="ck-gt" aria-expanded="false" title="G">Expand the git tree</button></span><span class="rail-notes" id="ck-notes"></span></div>
+    <div class="rail" id="ck-rail"></div>
+    <div class="gtree" id="ck-gtree" hidden></div>
+  </div>
+
+  <aside class="ck-list" aria-label="Tasks" id="ck-list"></aside>
+
+  <main class="ck-main" id="ck-main"></main>
+
+  <aside class="ck-hud" id="ck-hud" aria-label="This task"></aside>
+  <aside class="ck-side" aria-label="Status">
+    <div class="ck-box"><div class="ck-h3"><span>Needs you</span><span class="mono" id="ck-count2">0</span></div><div id="ck-needs"></div></div>
+  </aside>
+</div>
+</div>
+
+<div id="phone" class="pp"></div>
+
+<script type="module">
+// ---- view
+// Pure: a Board in, HTML strings and plain objects out. No DOM, no clock but the `now` it is given, so page.test.mjs runs it in node:vm.
+const STALE_MS = 10 * 60e3 // hooks/board.ts: a board older than this is silent
+const WORKING = ['assigned', 'work', 'report', 'judge']
+const h = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const rich = s => h(s).replace(/`([^`]+)`/g, '<span class="mono">$1</span>')
+const pad2 = n => String(n).padStart(2, '0')
+const clock = at => { const d = new Date(at); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
+const ago = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m${s % 60 ? pad2(s % 60) : ''}` : `${Math.floor(s / 3600)}h${pad2(Math.floor(s / 60) % 60)}` }
+const NX = '<span class="nx">Not exported yet</span>'
+const ICON = k => `<svg class="ico"><use href="#i-${k}"/></svg>`
+const ICO = { run: 'st-run', wait: 'st-wait', ready: 'st-ready', todo: 'st-todo', act: 'st-alert', done: 'st-done', gap: 'st-alert', none: 'st-todo', met: 'st-done' }
+const sico = s => `<svg class="sico ${s}" aria-hidden="true"><use href="#i-${ICO[s] ?? 'st-todo'}"/></svg>`
+
+const repoName = repo => String(repo ?? '').replace(/\/+$/, '').split('/').pop() || 'Overseer'
+// A board written before v3 carries none of the fields lot 36 adds: its write controls stay off.
+const isV3 = b => !!b && (typeof b.passEvery === 'number' || 'paused' in b || 'passing' in b || 'requests' in b)
+const isStale = (b, now) => now - b.at > STALE_MS
+const lotOf = (b, n) => (b.lots ?? []).find(l => l.n === n)
+// The tasks a plan card may approve or put off: those the board lists as proposed AND that its lots hold (PLAN.md at that pass). A proposal the
+// overseer has not written yet is "not in the plan yet": no Approve, nothing sent (the task 75 race).
+const inPlan = (b, n) => (b.lots ?? []).some(l => l.n === n)
+const askable = b => (b.proposed ?? []).filter(n => inPlan(b, n))
+const notYet = b => (b.proposed ?? []).filter(n => !inPlan(b, n))
+const sessionOf = (b, l) => l && (b.sessions ?? []).find(s => s.sessionId === l.session || (s.lot === l.n && WORKING.concat(['waits', 'stuck', 'gate']).includes(s.stage)))
+const depsDone = (b, l) => (l.depends ?? []).every(d => lotOf(b, d)?.status === 'done')
+
+// Where a lot's branch stands, from the board's own data (Board.branches, Board.worktrees): the branch of lot N is `lot/N-…`.
+function wtOf(b, l) {
+  const br = (b.branches ?? []).find(x => x.name === `lot/${l.n}` || x.name.startsWith(`lot/${l.n}-`))
+  const wt = br && (b.worktrees ?? []).find(w => w.branch === br.name)
+  return { branch: br?.name, files: br?.files, ahead: br?.ahead, conflicts: br?.merge?.conflicts ?? [], dirty: wt?.dirty ?? 0 }
+}
+
+// What waits for the person, in the order the lead ranks it (hooks/board.ts needsYou): a question, a workflow, the plan, a stuck
+// session, a blocked lot, the budget, a silent overseer. kind is the Review card: decision, approval or info.
+function needsOf(b, now) {
+  const out = [], ss = stage => (b.sessions ?? []).filter(s => s.stage === stage).sort((a, c) => a.since - c.since)
+  const name = n => { const l = lotOf(b, n); return n === undefined ? '' : `task ${n}${l ? ` · ${l.title}` : ''}` }
+  for (const s of ss('waits')) out.push({ id: s.sessionId, kind: 'decision', why: 'waits', red: true, lot: s.lot, session: s, head: name(s.lot) || s.label, title: s.ask?.question ?? s.question ?? 'This session waits for an answer.', age: now - s.since })
+  for (const s of ss('gate')) out.push({ id: s.sessionId, kind: 'approval', why: 'gate', red: true, lot: s.lot, session: s, head: name(s.lot) || s.label, title: `Approve the workflow ${s.gate?.name ?? ''} for ${s.lot !== undefined ? `task ${s.lot}` : s.label}?`.replace('  ', ' '), age: now - s.since })
+  if ((b.proposed ?? []).length) out.push({ id: 'plan', kind: 'approval', why: 'plan', red: false, head: `plan · tasks ${b.proposed[0]} to ${b.proposed[b.proposed.length - 1]}`, title: `Approve the ${b.proposed.length} new tasks of PLAN.md?`, age: undefined })
+  for (const s of ss('stuck')) out.push({ id: s.sessionId, kind: 'info', why: 'stuck', red: true, lot: s.lot, session: s, head: name(s.lot) || s.label, title: `Look at ${s.label}: stuck for ${ago(now - s.since)}${s.note ? ` (${s.note})` : ''}`, age: now - s.since })
+  for (const l of (b.lots ?? []).filter(x => x.status === 'blocked').sort((a, c) => a.n - c.n)) out.push({ id: `lot-${l.n}`, kind: 'info', why: 'blocked', red: true, lot: l.n, head: name(l.n), title: `Unblock task ${l.n}${l.note ? `: ${l.note}` : ''}`, age: l.verdictAt ? now - l.verdictAt : undefined })
+  if (b.budget && (b.budget.level === 'reduce' || b.budget.level === 'stop')) out.push({ id: 'budget', kind: 'info', why: 'budget', red: b.budget.level === 'stop', head: 'budget', title: b.budget.level === 'stop' ? 'Budget spent: raise it or let the run stop.' : 'Budget low: raise it or let the models step down.', cmd: '/oversee run <points>' })
+  if (isStale(b, now)) out.push({ id: 'stale', kind: 'info', why: 'stale', red: false, head: 'overseer', title: 'The overseer is silent: open its session and check it is still on.', age: now - b.at })
+  return out
+}
+const KIND_LABEL = { decision: 'Decision', approval: 'Approval', info: 'Info' }
+const KIND_COLOR = { decision: 'var(--act)', approval: 'var(--accent)', info: 'var(--ink-3)' }
+
+// A lot's marks by criterion: met, gap or todo. null when the board carries none (the page says so).
+const criteriaOf = l => (l.brief?.criteria?.length ? l.brief.criteria : String(l.doneWhen ?? '').split(/;\s+/).filter(Boolean))
+const marksOf = l => { const c = criteriaOf(l); return l.marks ? c.map((_, i) => l.marks.find(m => m.i === i) ?? { i, mark: 'todo' }) : null }
+
+// The status glyph of a lot, with the need on it: waiting beats running, a blocked lot is an alert.
+function glyphOf(b, l, needs) {
+  const need = needs.find(n => n.lot === l.n && ['waits', 'gate', 'blocked'].includes(n.why))
+  if (l.status === 'blocked') return 'act'
+  if (need) return 'wait'
+  return l.status === 'running' ? 'run' : l.status === 'done' ? 'done' : 'todo'
+}
+
+// The left list: lots with an open need, then running, then what is ready, then what waits; done lots fold.
+function groupLots(b, needs) {
+  const lots = [...(b.lots ?? [])].sort((a, c) => a.n - c.n), g = { needs: [], now: [], next: [], planned: [], done: [] }
+  const proposed = new Set(b.proposed ?? [])
+  for (const l of lots) {
+    if (l.status === 'done') g.done.push(l)
+    else if (proposed.has(l.n)) g.planned.push(l)
+    else if (l.status === 'blocked' || needs.some(n => n.lot === l.n && ['waits', 'gate'].includes(n.why))) g.needs.push(l)
+    else if (l.status === 'running') g.now.push(l)
+    else if (depsDone(b, l)) g.next.push(l)
+    else g.planned.push(l)
+  }
+  g.done.reverse() // newest first
+  return g
+}
+const listOrder = g => [...g.needs, ...g.now, ...g.next, ...g.planned]
+
+const etaOf = (b, l, now) => { const s = sessionOf(b, l); return l.status === 'running' && b.pace && s?.lotStartedAt ? `~${clock(s.lotStartedAt + b.pace)}` : '' }
+const stripOf = (b, l) => { const s = sessionOf(b, l), w = s && (b.workflows ?? []).find(x => x.isActive && (x.session === s.sessionId || x.session === s.label)); return w ? (w.steps?.length ? w.steps.map(x => `<i class="${x.state === 'done' ? 'done' : 'run'}"></i>`).join('') : `${'<i class="done"></i>'.repeat(w.done)}${'<i class="run"></i>'.repeat(w.running?.length ?? 0)}`) : '' }
+function subOf(b, l, now) {
+  const s = sessionOf(b, l)
+  if (l.status === 'running') return s ? `${s.label} · ${s.stage}${s.tries ? ` · try ${s.tries + 1}` : ''}` : 'running'
+  if (l.status === 'blocked') return l.note ?? 'blocked'
+  if (l.status === 'done') return l.verdict?.note ?? 'done'
+  const waits = (l.depends ?? []).filter(d => lotOf(b, d)?.status !== 'done')
+  return waits.length ? `after task${waits.length > 1 ? 's' : ''} ${waits.join(', ')}` : 'ready'
+}
+function rowHTML(b, l, sel, needs, now, small) {
+  const need = needs.find(n => n.lot === l.n && ['waits', 'gate', 'blocked'].includes(n.why)), eta = etaOf(b, l, now), strip = stripOf(b, l)
+  return `<button type="button" class="ck-row${small ? ' small' : ''}" aria-current="${l.n === sel}" data-n="${l.n}"><span class="gl">${sico(glyphOf(b, l, needs))}</span>
+    <span class="t"><b>${l.n} · ${rich(l.title)}</b><small>${h(subOf(b, l, now))}</small>${strip ? `<span class="strip">${strip}</span>` : ''}</span>
+    <span class="eta">${need ? `<i class="ask" title="needs you"></i>` : ''}${eta}</span></button>`
+}
+function listHTML(b, sel, needs, now, doneOpen) {
+  const g = groupLots(b, needs), sec = (t, aside, ls, small) => ls.length ? `<div class="ck-sec">${t}<span>${aside}</span></div><div class="ck-flow">${ls.map(l => rowHTML(b, l, sel, needs, now, small)).join('')}</div>` : ''
+  const running = g.now.length + g.needs.filter(l => l.status === 'running').length
+  return sec('Needs you', `${g.needs.length}`, g.needs) + sec('Now', `${running} running`, g.now) + sec('Next', 'ready', g.next) + sec('Planned', `${g.planned.length} tasks`, g.planned, true)
+    + (g.done.length ? `<button type="button" class="ck-sec ck-fold" id="ck-more" aria-expanded="${doneOpen}">Done<span>${g.done.length} tasks ${doneOpen ? '▾' : '▸'}</span></button>${doneOpen ? g.done.map(l => rowHTML(b, l, sel, needs, now, true)).join('') : ''}` : '')
+}
+
+// The rail: one segment per lot, the open lots wide with their branch and file count, release nodes from the graph's version tags.
+function railHTML(b, sel, needs) {
+  const lots = [...(b.lots ?? [])].sort((a, c) => a.n - c.n), g = groupLots(b, needs), open = new Set([...g.needs, ...g.now].map(l => l.n))
+  if (!open.size && g.next[0]) open.add(g.next[0].n)
+  const rel = new Map((b.graph ?? []).filter(r => r.version && r.lot !== undefined).map(r => [r.lot, r.version]))
+  const cls = l => (l.status === 'done' ? 'done' : l.status === 'blocked' ? 'act' : l.status === 'running' ? (needs.some(n => n.lot === l.n && n.why !== 'blocked') ? 'wait' : 'run') : 'todo')
+  const seg = l => { const w = wtOf(b, l), c = cls(l)
+    const node = rel.has(l.n) ? `<button type="button" class="rn" data-n="${l.n}" data-v="${h(rel.get(l.n))}" title="${h(rel.get(l.n))}"></button>` : ''
+    return open.has(l.n) ? `<button type="button" class="rl open ${c}" data-n="${l.n}" aria-current="${l.n === sel}"><i></i><small><b>${l.n}</b> ${h(w.branch ?? '')}</small><small>${w.branch ? `${w.files ?? 0} files` : 'no branch yet'}</small></button>${node}`
+      : `<button type="button" class="rl ${c}" data-n="${l.n}" aria-current="${l.n === sel}" title="${l.n} · ${h(l.title)}"><i></i></button>${node}` }
+  const done = lots.filter(l => l.status === 'done')
+  return (done.length ? `<button type="button" class="rl relseg" style="flex-grow:${Math.max(1, done.length / 3).toFixed(1)}" data-n="${done[done.length - 1].n}" title="${done.length} done"><i></i><small>${done.length} tasks</small></button>` : '')
+    + lots.filter(l => !(b.proposed ?? []).includes(l.n)).map(seg).join('')
+    + ((b.proposed ?? []).length ? `<button type="button" class="rl relseg plan" style="flex-grow:4" data-n="${b.proposed[0]}" title="${b.proposed.length} tasks, proposed"><i></i><small>${b.proposed.length} tasks · proposed</small></button>` : '')
+}
+function railNotes(b) {
+  const open = (b.branches ?? []).filter(x => x.merge), bad = open.filter(x => x.merge.conflicts.length)
+  return [open.length ? (bad.length ? `<span class="warn">merge: ${h(bad.map(x => x.name).join(', '))} conflict</span>` : '<span class="ok">test merge of the open tasks: no conflict</span>') : '',
+    (b.decisions ?? [])[0] ? `<span>decision: ${h(b.decisions[0].answer)}</span>` : '',
+    (b.atRisk ?? []).length && (b.atRisk).some(r => r.files.length) ? (n => `<span class="warn">closing now loses ${n} uncommitted file${n === 1 ? '' : 's'}</span>`)(b.atRisk.reduce((n, r) => n + r.files.length, 0)) : ''].filter(Boolean).join('')
+}
+const leftOf = (b, now) => { if (b.paused) return 'paused: running tasks finish, nothing new starts'
+  const left = (b.lots ?? []).filter(l => l.status !== 'done').length, busy = (b.sessions ?? []).filter(s => WORKING.includes(s.stage)).length
+  return b.pace && left ? `~${Math.max(1, Math.round(left * b.pace / Math.max(1, busy) / 60e3))} min left` : '' }
+
+// Stages and captions: what the funnel says of a lot, from what the board carries.
+function stagesOf(b, l, now) {
+  const s = sessionOf(b, l), w = s && (b.workflows ?? []).find(x => x.session === s.sessionId || x.session === s.label)
+  const nCr = (l.changes ?? []).length
+  const wf = s?.stage === 'gate' ? ['act', 'waits for your approval'] : w?.isActive ? ['run', `${w.phase ?? 'running'} · ${w.done}/${w.started} agents`] : w ? ['done', `${w.steps?.length ?? w.started} steps`] : ['none', l.status === 'done' ? 'not recorded' : 'no workflow yet']
+  const dirty = l.dirty ?? [], add = dirty.reduce((n, d) => n + d.add, 0), del = dirty.reduce((n, d) => n + d.del, 0)
+  const ch = dirty.length ? ['run', `${dirty.length} file${dirty.length > 1 ? 's' : ''} +${add} −${del}${nCr ? ` · ${nCr} request${nCr > 1 ? 's' : ''}` : ''}`] : l.tip ? ['done', `tip ${l.tip.slice(0, 7)}${nCr ? ` · ${nCr} request${nCr > 1 ? 's' : ''}` : ''}`] : nCr ? ['run', `${nCr} request${nCr > 1 ? 's' : ''}`] : ['none', 'no branch yet']
+  const marks = marksOf(l), gaps = (marks ?? []).filter(m => m.mark === 'gap').length || (l.gaps ?? []).length
+  const c = l.check, te = c && typeof c === 'object' ? [c.ok && !gaps ? 'done' : 'gap', `check ${c.ok ? 'green' : 'failed'}${c.tests ? ` · ${c.tests.pass} tests` : ''}${gaps ? ` · ${gaps} gap${gaps > 1 ? 's' : ''}` : ''}`] : typeof c === 'string' ? ['none', `not run yet: ${c}`] : ['none', 'not exported yet']
+  return { wf, ch, te }
+}
+const defaultStage = (b, l, now) => { const st = stagesOf(b, l, now); return ['wf', 'ch', 'te'].find(k => !['done', 'none'].includes(st[k][0])) ?? 'te' }
+const STG = [['wf', 'W', 'Workflow'], ['ch', 'C', 'Changes'], ['te', 'T', 'Tests']]
+const funnelHTML = (b, l, tab, now) => { const st = stagesOf(b, l, now)
+  return `<div class="fun" role="tablist" aria-label="Task stages">${STG.map(([k, key, name]) => `<button type="button" role="tab" data-tab="${k}" aria-pressed="${k === tab}" class="${st[k][0] === 'none' ? 'none' : ''}">${sico(st[k][0])}<b>${name}<kbd>${key}</kbd></b><small title="${h(st[k][1])}">${h(st[k][1])}</small></button>`).join('')}</div>` }
+
+// The brief: the contract of the lot, its criteria with the judge's marks.
+const goto = x => `<button type="button" class="chip" data-goto="${x}">${x}</button>`
+const refsFound = text => [...new Set(String(text ?? '').match(/https?:\/\/[^\s)`"']+|[\w./-]+\.(?:ts|tsx|mjs|js|md|json|html|css)\b/g) ?? [])].slice(0, 8)
+function briefHTML(b, l, full) {
+  const br = l.brief ?? {}, crit = criteriaOf(l), marks = marksOf(l), met = (marks ?? []).filter(m => m.mark === 'met').length
+  const ctx = br.problem ?? br.question, cut = crit.length > 4 && !full
+  const blk = (b.lots ?? []).filter(x => (x.depends ?? []).includes(l.n)).map(x => x.n)
+  const refs = [`<span class="chip">PLAN.md §${l.n}</span>`, ...refsFound(ctx).map(r => (r.startsWith('http') ? `<a class="chip" href="${h(r)}" target="_blank" rel="noopener">${h(r.replace(/^https?:\/\//, '').slice(0, 40))} ↗</a>` : `<span class="chip">${h(r)}</span>`)),
+    (l.depends ?? []).length ? `<span class="lbl">after</span>${l.depends.map(goto).join('')}` : '', blk.length ? `<span class="lbl">blocks</span>${blk.map(goto).join('')}` : ''].filter(Boolean)
+  const scope = [...(br.keep ?? []).map((k, i) => `<p>${i ? '' : '<b>Keep</b>'}${rich(k)}</p>`), ...(br.notIn ?? []).map((k, i) => `<p>${i ? '' : '<b>Not in this task</b>'}${rich(k)}</p>`), ...(br.risk ?? []).map((r, i) => `<p>${i ? '' : '<b>Risk</b>'}${rich(r.event)}${r.mitigation ? ` → ${rich(r.mitigation)}` : ''}</p>`)]
+  const items = crit.map((c, i) => { const m = marks?.[i]; return `<li class="${m?.mark ?? 'todo'}" title="${h(c)}">${sico(m?.mark ?? 'todo')}<span>${rich(c)}</span>${m?.ev ? `<small>${rich(m.ev)}</small>` : ''}</li>` })
+  return `<dl class="lb${full ? ' full' : ''}">
+    <dt>Context</dt><dd>${ctx ? `<p class="clamp">${rich(ctx).replace(/Victor, \d{4}-(\d{2})-(\d{2}):/g, '<span class="vq">Victor, $2/$1:</span>')}</p>` : NX}</dd>
+    <dt>Done when</dt><dd><span class="lb-n">${crit.length ? (marks ? `${met} of ${crit.length} met` : `${crit.length} criteria · marks ${NX}`) : NX}</span><ul class="crit">${items.slice(0, cut ? 4 : 99).join('')}</ul></dd>
+    ${full && scope.length ? `<dt>Scope</dt><dd class="scope">${scope.join('')}</dd>` : ''}
+    <dt class="rf">Refs</dt><dd class="refs rf">${refs.join('')}</dd>
+  </dl><button type="button" class="lb-more" id="lb-more">${full ? 'Show less' : ['Show all', cut && `${crit.length - 4} more criteria`, scope.length && 'scope', 'refs'].filter(Boolean).join(' · ')}</button>`
+}
+
+// The change requests of the lot: the list with each state, and the form that writes one.
+function crHTML(b, l, draft, enabled) {
+  const reopened = /^reopened\b/.test(l.note ?? '') || (!!l.retry && l.status !== 'done') // a change request or the judge sent it back
+  const list = l.changes ?? [], running = l.status === 'running', where = d => `${d.file ?? 'the whole task'}${d.line ? `:${d.line}` : ''}`
+  return `<div class="cr"><div class="cr-head"><span class="say">${reopened ? 'Reopened. ' : ''}${running ? 'Requests go to the session that holds the task. It reads them at its next turn.' : l.status === 'done' ? 'A request reopens this task.' : 'The next message of this task carries the request.'}</span><button type="button" class="ck-go" id="cr-new" ${enabled ? '' : 'disabled'}><kbd>R</kbd>Request a change</button></div>
+    ${draft && draft.n === l.n ? `<form class="cr-form" id="cr-form"><span class="eyebrow">On ${h(draft.where || 'the whole task')}</span><textarea id="cr-text" placeholder="What must change?" aria-label="Change request">${h(draft.text ?? '')}</textarea>
+      <div class="zacts"><button type="submit" class="rec" data-w="change">${l.status === 'done' ? 'Reopen the task and send' : 'Send'}<kbd>⌘↵</kbd></button><button type="button" id="cr-cancel"><kbd>Esc</kbd>Cancel</button></div></form>` : ''}
+    ${list.map(c => `<div class="cr-item ${c.state}">${sico(c.state === 'done' ? 'done' : c.state === 'dropped' ? 'act' : 'wait')}<div><b class="mono">${h(where(c))}</b><span>${h(c.text)}</span><small>${clock(c.at)} · ${c.state === 'done' ? 'made' : c.state === 'dropped' ? 'dropped' : h(c.queued ?? 'sent')}</small></div></div>`).join('')}
+  </div>`
+}
+
+// The HUD (task 63): only what the board exports and what helps decide. No model name (Victor, 2026-10-23), no clock-time ETA:
+// `pace` is one median for every task, so it is a yardstick for the elapsed time, never an estimate of this task.
+const wfStep = (b, s) => { // "step i of n" of the workflow of the session: the steps done, plus the one that runs
+  const w = s && (b.workflows ?? []).find(x => x.session === s.sessionId || x.session === s.label)
+  if (!w) return 'no workflow'
+  const n = w.steps?.length ?? w.started, d = w.steps ? w.steps.filter(x => x.state === 'done').length : w.done
+  return n ? `step ${Math.min(n, d + (w.isActive ? 1 : 0))} of ${n}` : 'no workflow'
+}
+function hudHTML(b, l, now, enabled) {
+  const marks = marksOf(l), met = (marks ?? []).filter(m => m.mark === 'met').length, s = sessionOf(b, l)
+  const kv = (v, cap) => `<div class="hud-kv"><b>${v}</b><small>${cap}</small></div>`
+  const row = (k, ic, name, cap) => `<button type="button" class="hud-row" data-tab="${k}">${sico(ic)}<span><b>${name}</b><small>${cap}</small></span></button>`
+  const st = stagesOf(b, l, now), t0 = s?.lotStartedAt
+  // 1. elapsed against the median: the track is 2 x pace, so the bar is full, and --act, exactly when the task is longer than usual
+  const el = t0 ? now - t0 : 0, long = !!(t0 && b.pace && el > 2 * b.pace)
+  const elapsed = t0 ? kv(ago(el), b.pace ? `of ${ago(b.pace)} usual${long ? ' · longer than usual' : ''}` : NX) + (b.pace ? `<span class="hud-bar pace${long ? ' long' : ''}" role="meter" aria-label="Elapsed against the run's median" aria-valuemin="0" aria-valuemax="${2 * b.pace}" aria-valuenow="${Math.min(el, 2 * b.pace)}"><i style="width:${Math.min(100, Math.round(el / (2 * b.pace) * 100))}%"></i></span>` : '')
+    : kv('—', l.status === 'done' ? NX : 'not started')
+  // 2. stage, try (tries counts the retries the judge sent back to the session) and session label
+  const stage = s ? kv(h(s.stage), `try ${s.tries + 1} · ${h(s.label)}`) : kv('—', 'no session')
+  // 5. the last test run
+  const c = l.check, ck = c && typeof c === 'object' ? row('te', c.ok ? 'done' : 'gap', 'Last test run', `${c.ok ? 'pass' : 'fail'} · ${ago(now - c.at)} ago`) : row('te', 'none', 'Last test run', typeof c === 'string' ? `not run yet` : 'not exported yet')
+  // 6. the changes: committed (stat, else the sum of files) and the files not committed yet
+  const dirty = l.dirty ?? [], sum = (xs, i) => xs.reduce((n, x) => n + x[i], 0)
+  const tot = l.stat ?? (l.files ? { files: l.files.length, add: sum(l.files, 0), del: sum(l.files, 1) } : undefined)
+  const rows = [...dirty.map(d => ({ path: d.path, add: d.add, del: d.del, dirty: true })), ...(l.files ?? []).filter(f => !dirty.some(d => d.path === f[2])).map(f => ({ path: f[2], add: f[0], del: f[1] }))]
+  const count = tot ? `${tot.files} file${tot.files === 1 ? '' : 's'}, +${tot.add} −${tot.del}` : dirty.length ? `${dirty.length} not committed` : ''
+  const files = rows.length || tot ? `<div class="hud-sec"><span class="hud-h">Changes <span class="mono">${h(count)}</span></span>${rows.length ? `<ul class="hud-files">${rows.slice(0, 6).map(d => `<li><button type="button" data-cr="${h(d.path)}" title="Comment on ${h(d.path)}"><span class="mono">${h(d.path.split('/').pop())}</span><span class="a">+${d.add}</span><span class="r">−${d.del}</span>${d.dirty ? '<em>not committed</em>' : ''}</button></li>`).join('')}</ul>` : ''}${rows.length > 6 ? `<span class="hud-more">${rows.length - 6} more files</span>` : ''}</div>`
+    : `<div class="hud-sec"><span class="hud-h">Changes <span class="mono">${l.status === 'todo' ? '' : 'not exported yet'}</span></span></div>`
+  const pts = l.tokens && b.budget ? (l.tokens * b.budget.spent / Math.max(1, (b.lots ?? []).reduce((n, x) => n + (x.tokens ?? 0), 0))).toFixed(1) : ''
+  return `<span class="eyebrow">Task ${l.n} · ${l.status === 'running' ? 'live' : l.status}</span>
+    <div class="hud-sec"><span class="hud-h">Elapsed</span>${elapsed}</div>
+    <div class="hud-sec"><span class="hud-h">Stage</span>${stage}</div>
+    <div class="hud-sec"><span class="hud-h">Criteria <span class="mono">${marks ? `${met} of ${marks.length} met` : 'not exported yet'}</span></span>${marks ? `<span class="hud-bar" aria-hidden="true">${marks.map(m => `<i class="${m.mark}"></i>`).join('')}</span>` : ''}</div>
+    <div class="hud-sec">${row('wf', st.wf[0] === 'none' ? 'none' : st.wf[0], 'Workflow', wfStep(b, s))}${ck}</div>
+    ${files}
+    ${l.tip ? `<div class="hud-sec"><span class="hud-h">Last commit</span><span class="hud-commit">${ICON('commit')}<span class="mono">${h(l.tip.slice(0, 7))}</span></span></div>` : ''}
+    <div class="hud-sec"><span class="hud-h">Points</span>${pts ? kv(pts, 'points') : NX}</div>
+    <button type="button" class="ck-go hud-cr" data-cr="" ${enabled ? '' : 'disabled'}><kbd>R</kbd>Request a change</button>`
+}
+
+// The server runs older or newer code than the overseer that wrote the board (lot 51): say so, with what to do.
+const versionNote = (server, overseer) => (server && overseer && server !== overseer ? `<div class="ck-banner" role="status">${ICON('alert')}<span>server ${h(server)}, overseer ${h(overseer)}: restart it</span></div>` : '')
+const NEED_LINE = { waits: 'This task asks you a question.', gate: 'This workflow waits for your approval.', blocked: 'This task is blocked and waits for your action.', plan: 'This task is a proposal.', stuck: 'This task is stuck.' }
+function paneHTML(b, l, o) { // o: { tab, full, needs, now, draft, enabled }
+  const s = sessionOf(b, l), need = o.needs.findIndex(n => n.lot === l.n && ['waits', 'gate', 'blocked'].includes(n.why))
+  const status = l.status === 'running' ? (s ? `${s.label}${s.model ? ` (${s.model})` : ''} · ${s.stage}` : 'running') : l.status === 'blocked' ? `blocked${l.note ? ` · ${l.note}` : ''}` : l.status === 'done' ? (l.verdict?.note ?? 'done') : 'not started'
+  return `<div class="ck-mh">${sico(glyphOf(b, l, o.needs))}<span class="num mono">${l.n}</span><h2>${rich(l.title)}</h2><span class="st">${h(status)}</span></div>
+    ${versionNote(o.server, b.mod?.version)}
+    ${b.error ? `<div class="ck-banner" role="alert">${ICON('alert')}<span>${h(b.error.text)} <small class="mono">${h(b.error.source)} · ${ago(o.now - b.error.at)} ago</small></span></div>` : ''}
+    ${briefHTML(b, l, o.full)}
+    ${funnelHTML(b, l, o.tab, o.now)}
+    <div class="ck-body">${need >= 0 ? `<p class="ck-ask">${sico('gap')}<span>${NEED_LINE[o.needs[need].why]}</span><button type="button" class="ck-go" data-z="${need}">Review it<kbd>↵</kbd></button></p>` : ''}${o.tab === 'ch' ? crHTML(b, l, o.draft, o.enabled) : ''}<div id="ck-stage"></div></div>`
+}
+
+// The Needs-you box of the side column and the log.
+const needBoxHTML = (needs, done) => needs.map((n, i) => `<button type="button" class="ck-need${done.has(n.id) ? ' done' : ''}" data-z="${i}"><span class="kind" style="color:${KIND_COLOR[n.kind]}">${KIND_LABEL[n.kind]}</span><span class="what"><b>${rich(n.head)}</b><small>${h(n.title)}</small></span><span class="mono">${n.age !== undefined ? ago(n.age) : '—'}</span></button>`).join('')
+const logHTML = b => [...(b.feed ?? [])].sort((x, y) => y.at - x.at).slice(0, 6).map(f => `<span class="mono">${clock(f.at)}</span><span>${h(f.action)} → ${h(f.label)}</span>`).join('')
+
+const logBoxHTML = b => `<div class="ck-box ck-logbox"><div class="ck-h3"><span>Log</span></div><div class="ck-log" id="ck-log">${b.feed ? logHTML(b) : NX}</div></div>`
+
+// A Review card. Options are numbered keys; the recommended one is the red button; every button that writes carries data-w.
+function cardHTML(b, n, now, enabled) {
+  const dis = enabled ? '' : ' disabled', s = n.session, head = `<div class="zkind"><span><b>${KIND_LABEL[n.kind]}</b>${rich(n.head)}</span><span class="mono">${n.age !== undefined ? `waited ${ago(n.age)}` : 'drafted by the lead'}</span></div><p class="zq">${rich(n.title)}</p>`
+  const reply = (ph) => `<div class="zreply" hidden><textarea aria-label="Your answer" placeholder="${h(ph)}"></textarea></div>`
+  if (n.why === 'waits') {
+    const opts = s.ask?.options ?? [], rec = s.recommend?.option?.toLowerCase()
+    const isRec = o => rec && (o.toLowerCase() === rec || rec.startsWith(o.toLowerCase()) || o.toLowerCase().startsWith(rec))
+    const link = !opts.length && /^https:\/\/claude\.ai\/code\/[A-Za-z0-9_-]{1,80}$/.test(s.link ?? '') ? `<a class="chip" href="${h(s.link)}" target="_blank" rel="noopener">Répondre dans Remote Control ↗</a>` : ''
+    return `<article class="zcard k-decision" data-z="${h(n.id)}">${head}${s.recommend ? `<p class="d-why">Recommends: ${rich(s.recommend.option)}${s.recommend.why ? ` — ${rich(s.recommend.why)}` : ''}</p>` : ''}<div class="zacts">${opts.map((o, i) => `<button type="button" class="${isRec(o) ? 'rec' : ''}" data-key="${i + 1}" data-w="answer" data-label="${h(o)}"${dis}><kbd>${i + 1}</kbd>${h(o)}${isRec(o) ? '<small>recommended</small>' : ''}</button>`).join('')}<button type="button" data-act="reply" data-w="answer" data-label="reply"${dis}><kbd>↵</kbd>Write an answer</button></div>${link}${reply('Write your answer. Enter sends it. Esc closes this box.')}${ctxHTML(b, n)}</article>`
+  }
+  if (n.why === 'gate') {
+    const ag = s.gate?.agents ?? []
+    return `<article class="zcard k-approval" data-z="${h(n.id)}">${head}<div class="wf-sum mono"><span>${ag.length} step${ag.length === 1 ? '' : 's'}</span>${ag.map(a => `<span>${h(a.label)}${a.model ? ` · ${h(a.model)}` : ''}</span>`).join('') || NX}</div>
+      <div class="zacts"><button type="button" class="rec" data-key="a" data-w="gate" data-label="approve"${dis}><kbd>A</kbd>Approve</button><button type="button" data-key="c" data-act="reply" data-w="gate" data-label="change"${dis}><kbd>C</kbd>Change</button><button type="button" data-key="r" data-w="gate" data-label="reject"${dis}><kbd>R</kbd>Reject</button></div>${reply('What must change? Enter sends it. Esc closes this box.')}</article>`
+  }
+  if (n.why === 'plan') return `<article class="zcard k-approval" data-z="plan">${head}<div class="wf-sum mono"><span>${b.proposed.length} tasks</span><span>tasks ${b.proposed[0]} to ${b.proposed[b.proposed.length - 1]}</span>${notYet(b).length ? `<span>${notYet(b).join(', ')}: not in the plan yet</span>` : ''}</div>
+      <div class="zacts">${askable(b).length ? `<button type="button" class="rec" data-key="a" data-w="plan" data-label="approve"${dis}><kbd>A</kbd>Approve</button>` : ''}<button type="button" data-key="c" data-act="reply" data-w="plan" data-label="change"${dis}><kbd>C</kbd>Change a task</button></div>${reply('Which task, and what must change? Enter sends it. Esc closes this box.')}</article>`
+  return `<article class="zcard k-info" data-z="${h(n.id)}">${head}${n.cmd ? `<code class="cmd">${h(n.cmd)}</code>` : ''}<div class="zacts">${n.why === 'blocked' ? `<button type="button" class="rec" data-key="e" data-w="lot" data-label="done"${dis}><kbd>E</kbd>Done</button>` : '<button type="button" class="rec" data-key="e" data-act="skip"><kbd>E</kbd>Done</button>'}${n.cmd ? `<button type="button" data-key="y" data-act="copy" data-label="copy" data-cmd="${h(n.cmd)}"><kbd>Y</kbd>Copy the command</button>` : ''}</div></article>`
+}
+// The context under a decision: the files of its lot, one at a time (, and . change the file).
+function ctxHTML(b, n) {
+  const l = n.lot !== undefined ? lotOf(b, n.lot) : undefined, files = l?.dirty ?? []
+  const decided = (b.decisions ?? []).filter(d => String(d.lot) === String(n.lot)).slice(0, 2) // the decisions already taken on this lot (DECISIONS.md)
+  return `<div class="zctx">${decided.map(d => `<div class="zctx-h"><span>Decided ${h(d.at)}: ${rich(d.question)}</span><b>${rich(d.answer)}</b></div>`).join('')}<div class="zctx-h"><span>Context · ${files.length ? `file <b id="z-file">1</b> of ${files.length} on <span class="mono">${h(wtOf(b, l).branch ?? `task ${l.n}`)}</span>` : `${NX}`}</span>${files.length > 1 ? '<span><kbd>,</kbd> <kbd>.</kbd> change the file</span>' : ''}</div>
+    ${files.map((f, i) => `<div class="diff" data-file${i ? ' hidden' : ''}><div class="dh"><span class="mono">${h(f.path)}</span><span class="fs"><span class="a">+${f.add}</span> <span class="r">−${f.del}</span></span></div></div>`).join('')}</div>`
+}
+function dockHTML(card, replying) {
+  const K = (k, t) => `<span><kbd>${k}</kbd>${t}</span>`
+  if (!card) return K('Esc', 'overview')
+  if (replying) return K('↵', 'send') + K('Esc', 'close the box')
+  return K('←', '') + K('→', 'move') + (card.querySelectorAll ? [...card.querySelectorAll('[data-key]')].map(b => K(b.dataset.key.toUpperCase(), b.dataset.label ?? '')).join('') : '') + K('⌘↵', 'recommended, then next') + K('↵', 'answer') + (card.querySelector('[data-file]') ? K(',', '') + K('.', 'file') : '') + K('Esc', 'overview')
+}
+
+// The top bar's state: the live pill and its words, in the order of CONTRACT.md "Failure states".
+function pillOf(b, now, connected) {
+  if (!connected) return { state: 'disconnected', text: 'disconnected', off: true }
+  if (b.error) return { state: 'error', text: 'error', off: true }
+  if (isStale(b, now)) return { state: 'silent', text: `silent ${ago(now - b.at)}`, off: true }
+  return b.paused ? { state: 'paused', text: 'paused', off: true } : { state: 'live', text: 'live', off: false }
+}
+// Points spent per hour, from the budget series (hooks/register.tsx writes one point per pass): the last hour of it; none with fewer than 2 points.
+const rateOf = (b, now) => { const p = (b.budget?.series ?? []).filter(x => now - x.at <= 3600e3); return p.length >= 2 && p[p.length - 1].at > p[0].at ? (p[p.length - 1].spent - p[0].spent) / ((p[p.length - 1].at - p[0].at) / 3600e3) : undefined }
+const passOf = (b, now) => { const every = b.passEvery ?? 180e3, left = Math.max(0, Math.round((b.nextPassAt - now) / 1000))
+  return b.passing ? { text: '…', label: 'reading the sessions…', arc: 100 } : { text: `${Math.floor(left / 60)}:${pad2(left % 60)}`, label: 'next pass', arc: Math.min(100, Math.round(left * 1000 / every * 100)) } }
+// ---- end view
+
+// ---- page
+// The DOM side: the board from /board/<slug> and /events/<slug>, the writes (each a POST of CONTRACT.md), the keys.
+const $ = id => document.getElementById(id)
+const LS = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { localStorage.setItem(k, v) } catch {} } }
+const ck = $('view-cockpit')
+const S = {
+  slug: null, board: null, connected: false, boards: [], sel: null, tab: null, tabFor: null, full: false, draft: null,
+  doneOpen: LS.get('ck-done') === 'open', view: 'cockpit', back: 'cockpit', zi: 0, zdone: new Set(), replying: false, zKey: 0, ckZ: 0, writes: {}, openSteps: new Set(), file: 0,
+}
+const now = () => Date.now()
+const enabled = () => !!S.board && S.connected && isV3(S.board)
+const needs = () => (S.board ? needsOf(S.board, now()) : [])
+const openNeeds = () => needs().filter(n => !S.zdone.has(n.id))
+
+// ---- writes: a POST of the body CONTRACT.md gives (slug and id added); the control says sent, then done or refused: <why>
+const idOf = kind => `${kind}-${now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+async function post(kind, fields, key, card) {
+  if (!enabled()) return
+  const id = idOf(kind)
+  delete S.writes[key] // sending again clears a refused state of this control, and puts the new one last
+  S.writes[key] = { id, state: 'sent', card }
+  paintWrites()
+  try {
+    const r = await fetch(`/${kind}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug: S.slug, id, ...fields }) })
+    if (r.status !== 202) S.writes[key] = { id, state: 'refused', why: r.status === 409 ? 'its session is not watched' : `server answered ${r.status}`, card }
+  } catch { S.writes[key] = { id, state: 'refused', why: 'no connection', card } }
+  paintWrites()
+}
+// The overseer's outcome of each request (Board.requests): done goes with the card, dropped says why.
+function resolveWrites() {
+  for (const [key, w] of Object.entries(S.writes)) {
+    if (w.state !== 'sent') continue
+    const r = (S.board?.requests ?? []).find(x => x.id === w.id)
+    if (!r) continue
+    if (r.state === 'done') { w.state = 'done'; if (w.card && !/:(approve|decline):\d+$/.test(key)) S.zdone.add(w.card); if (key.startsWith('change:')) S.draft = null }
+    else S.writes[key] = { ...w, state: 'refused', why: r.why ?? 'refused' }
+  }
+}
+function wkOf(el) {
+  if (el.id === 'ck-live') return 'run'
+  if (el.id === 'ck-pass') return 'pass'
+  if (el.closest('#cr-form')) return `change:${S.sel}`
+  const card = el.closest('[data-z]')
+  return card ? `${el.dataset.w}:${card.dataset.z}:${el.dataset.label ?? ''}` : el.dataset.w
+}
+function paintWrites() {
+  const on = enabled()
+  for (const el of document.querySelectorAll('[data-w]')) {
+    el.disabled = !on
+    el.querySelector(':scope > .w-state')?.remove()
+    const w = S.writes[wkOf(el)]
+    if (!w || w.state === 'done') continue
+    const s = document.createElement('span')
+    s.className = `w-state${w.state === 'refused' ? ' refused' : ''}`
+    s.textContent = w.state === 'sent' ? 'sent' : `refused: ${w.why}`
+    if (w.state === 'refused') { const x = document.createElement('span'); x.className = 'w-x'; x.dataset.clear = wkOf(el); x.setAttribute('role', 'button'); x.tabIndex = 0; x.setAttribute('aria-label', 'Clear this message'); x.textContent = '×'; s.append(x) }
+    el.append(s)
+  }
+  for (const el of document.querySelectorAll('#cr-new,.hud-cr')) el.disabled = !on
+}
+
+// ---- the board: preserved across an incoming one (the text and caret of a request, the open steps, the scroll)
+function keep() {
+  const a = document.activeElement, ta = a && a.tagName === 'TEXTAREA' ? a : null
+  return { scroll: ['ck-list', 'ck-main', 'ck-hud', 'view-review'].map(id => [id, $(id)?.scrollTop ?? 0]), focus: ta && ta.id === 'cr-text' ? { id: ta.id, s: ta.selectionStart, e: ta.selectionEnd } : null }
+}
+function restore(k) {
+  for (const [id, top] of k.scroll) if ($(id)) $(id).scrollTop = top
+  if (k.focus) { const ta = $(k.focus.id); if (ta) { ta.focus(); ta.setSelectionRange(k.focus.s, k.focus.e) } }
+}
+// The clipboard, for Y and for the copy chips of a stage: the text goes to the clipboard, the control's last child says Copied.
+function copy(text, el) { navigator.clipboard?.writeText(text).then(() => { el.lastChild.textContent = 'Copied' }, () => {}) }
+const stageName = tab => ({ wf: 'workflow', ch: 'changes', te: 'tests' })[tab]
+const modules = {}
+async function mountStage(l, tab) {
+  const box = $('ck-stage'), name = stageName(tab)
+  if (!box) return
+  try {
+    modules[name] ??= await import(`/stages/${name}.js`)
+    if (box !== $('ck-stage')) return // another render came first
+    const ctx = { lot: l, board: S.board, now: now(), esc: h, sico, slug: S.slug, rerender: () => render(), draft: setDraft, copy }
+    box.innerHTML = modules[name].render(ctx)
+    modules[name].attach?.(box, ctx)
+    for (const d of box.querySelectorAll('details[data-id]')) d.open = S.openSteps.has(d.dataset.id) || d.open
+    modules[name].mount?.(box, ctx) // wires the clicks inside the box (turn tabs, screen tabs)
+  } catch { box.innerHTML = NX }
+}
+async function drawTree() {
+  const el = $('ck-gtree')
+  try { modules.gittree ??= await import('/gittree.js'); modules.gittree.draw(el, { board: S.board, selected: S.sel, select: n => { S.sel = String(n); render() }, esc: h }) } catch { el.innerHTML = `<p class="dl">${NX}</p>` }
+}
+
+function render() {
+  const b = S.board
+  if (!b) { $('ck-main').innerHTML = `<section class="ck-empty">${S.connected ? 'Waiting for the first board…' : 'Disconnected: the board is not reachable.'}</section>`; paintTop(); renderPhone(); return }
+  const k = keep(), t = now(), ns = needs()
+  const g = groupLots(b, ns), order = listOrder(g).concat(g.done)
+  if (S.sel === null || !order.some(l => String(l.n) === String(S.sel))) S.sel = order[0] ? String(order[0].n) : null
+  paintTop(); paintMenu()
+  $('ck-list').innerHTML = ((b.lots ?? []).length ? listHTML(b, +S.sel, ns, t, S.doneOpen) : '') + logBoxHTML(b) // the side column is hidden in the lean view (board.css), so the log sits under the list
+  $('ck-rail').innerHTML = railHTML(b, +S.sel, ns)
+  $('ck-lots').textContent = `${(b.lots ?? []).filter(l => l.status === 'done').length} of ${(b.lots ?? []).length} tasks`
+  $('ck-left2').textContent = leftOf(b, t) ? ` · ${leftOf(b, t)}` : ''
+  $('ck-notes').innerHTML = railNotes(b)
+  const l = S.sel === null ? undefined : lotOf(b, +S.sel)
+  if (S.tabFor !== S.sel) { S.tabFor = S.sel; S.tab = null; S.full = false; S.file = 0 }
+  const tab = S.tab ?? (l ? defaultStage(b, l, t) : 'te')
+  if (!l) { $('ck-main').innerHTML = `<section class="ck-empty">No tasks yet: write PLAN.md (one <span class="mono">## [ ] 1. Title</span> section per task, with a <span class="mono">done when:</span> line), then run <span class="mono">/oversee run</span>.</section>`; $('ck-hud').innerHTML = '' }
+  else { $('ck-main').innerHTML = paneHTML(b, l, { tab, full: S.full, needs: ns, now: t, draft: S.draft, enabled: enabled(), server: S.server }); $('ck-hud').innerHTML = hudHTML(b, l, t, enabled()); mountStage(l, tab) }
+  $('ck-needs').innerHTML = needBoxHTML(ns, S.zdone)
+  const open = openNeeds()
+  $('ck-count').textContent = open.length; $('ck-count2').textContent = open.length
+  $('ck-review').classList.toggle('none', !open.length)
+  $('ck-review-t').textContent = open.length ? 'Review what needs you' : 'Nothing needs you'
+  document.querySelector('#ck-main .ck-ask [data-z]')?.setAttribute('data-z', String(ns.findIndex(n => n.lot === +S.sel && ['waits', 'gate', 'blocked'].includes(n.why))))
+  if (ck.classList.contains('gt-open')) drawTree()
+  renderReview()
+  paintWrites()
+  restore(k)
+  renderPhone()
+}
+
+function paintTop() {
+  const b = S.board, t = now()
+  if (!b) { $('ck-livel').textContent = 'disconnected'; $('ck-live').classList.add('off'); return }
+  $('pj-name').textContent = repoName(b.repo)
+  $('pj-goal').textContent = b.goal ?? ''
+  const pill = pillOf(b, t, S.connected), live = $('ck-live')
+  live.classList.toggle('off', pill.off)
+  live.style.cssText = pill.state === 'error' ? 'background:var(--act-soft)' : ''
+  live.setAttribute('aria-pressed', String(b.paused === true))
+  $('ck-livel').textContent = pill.text
+  live.title = pill.state === 'live' ? 'Live: the overseer gives tasks to free sessions. Click to pause.' : pill.state === 'paused' ? 'Paused: no new task goes out. Running tasks finish. Click to resume.' : pill.state === 'error' ? `The overseer reports an error: ${b.error.text}` : pill.state === 'silent' ? `The overseer wrote its last board ${ago(t - b.at)} ago: open its session and check it is on.` : 'The page lost its connection to the board server.'
+  const p = passOf(b, t)
+  $('ck-left').textContent = p.text; $('ck-passl').textContent = p.label
+  $('ck-arc').setAttribute('stroke-dasharray', `${p.arc} 100`)
+  const busy = (b.sessions ?? []).filter(s => WORKING.includes(s.stage)).length, total = (b.sessions ?? []).length
+  $('ck-busy').textContent = `${busy}/${total}`
+  $('ck-sessions').title = `${busy} of ${total} sessions busy`
+  $('ck-pips').innerHTML = (b.sessions ?? []).map(s => `<i${WORKING.includes(s.stage) ? ' class="on"' : ''}></i>`).join('')
+  const bud = b.budget
+  $('ck-pts').innerHTML = bud ? `${bud.spent.toFixed(1)}/${bud.budget}` : NX
+  { const r = bud && rateOf(b, t); $('ck-ptsl').textContent = r === undefined ? 'weekly-limit pts' : `weekly-limit pts · ${r.toFixed(1)}/h` }
+  $('ck-meter').style.width = bud ? `${Math.min(100, Math.round(bud.spent / bud.budget * 100))}%` : '0'
+  $('ck-budget').title = bud ? `Run budget: ${bud.spent.toFixed(1)} of ${bud.budget} weekly-limit points spent since the run started. At half the budget models step down; at ${bud.budget}, no new task goes out.` : 'The board carries no budget.'
+}
+function paintMenu() {
+  const b = S.board, cur = S.boards.find(x => x.slug === S.slug)
+  const items = S.boards.length ? S.boards : [{ slug: S.slug, repo: b.repo, goal: b.goal, needs: needs().length, done: 0, total: (b.lots ?? []).length, stale: false }]
+  $('pj-list').innerHTML = `<span class="eyebrow">Projects · from /boards</span>` + items.map(x => `<button type="button" role="menuitemradio" aria-checked="${x.slug === S.slug}" data-pj="${h(x.slug)}"${x.stale ? ' class="stale"' : ''}><b>${h(repoName(x.repo))}</b><span class="pj-n${x.needs ? ' act' : ''}">${x.slug === S.slug ? needs().length : x.needs}</span><small>${h(x.goal ?? '')} · ${x.done} of ${x.total} tasks${x.stale ? ' · silent' : ''}</small></button>`).join('')
+}
+
+// ---- Review
+function renderReview() {
+  const b = S.board, open = openNeeds(), cards = $('z-cards')
+  if (!b) return
+  if (S.zi >= open.length) S.zi = Math.max(0, open.length - 1)
+  const n = open[S.zi]
+  cards.innerHTML = n ? cardHTML(b, n, now(), enabled()) : ''
+  $('z-end').hidden = open.length > 0
+  $('z-pos').textContent = open.length ? `${S.zi + 1} of ${open.length}` : 'done'
+  $('z-next').textContent = b.pace ? '' : ''
+  $('z-prog').innerHTML = needs().map(x => `<i class="${S.zdone.has(x.id) ? 'done' : x.id === n?.id ? 'cur' : ''}"></i>`).join('')
+  const card = cards.querySelector('.zcard')
+  $('z-dock').innerHTML = dockHTML(open.length ? card : null, S.replying)
+  paintWrites()
+}
+function setView(v) {
+  if (v === 'review' && S.view !== 'review') S.back = S.view
+  S.view = v
+  $('view-cockpit').hidden = v !== 'cockpit'; $('view-review').hidden = v !== 'review'
+  document.querySelectorAll('[data-view]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.view === v)))
+  document.body.style.overflow = v === 'cockpit' ? 'hidden' : ''
+  try { history.replaceState(null, '', `#${v === 'cockpit' ? 'overview' : v}`) } catch {}
+  if (v === 'review') { S.replying = false; renderReview(); scrollTo(0, 0) }
+}
+const openReview = (i = 0) => { S.zi = Math.max(0, openNeeds().findIndex(n => n.id === needs()[i]?.id)); setView('review') }
+const move = d => { const o = openNeeds(); if (o.length) { S.zi = (S.zi + d + o.length) % o.length; S.replying = false; renderReview() } }
+function peel(id) { // a card that is done leaves; the next one comes
+  const card = $('z-cards').querySelector('.zcard'), still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const go = () => { S.zdone.add(id); renderReview(); render() }
+  if (card && !still) { card.classList.add('peel'); setTimeout(go, 220) } else go()
+}
+const cardNeed = () => openNeeds()[S.zi]
+// What each Review control sends (CONTRACT.md KEYS and endpoints)
+function act(btn) {
+  const n = cardNeed(), w = btn.dataset.w, label = btn.dataset.label
+  if (!n) return
+  const card = n.id, key = `${w}:${card}:${label ?? ''}`
+  if (w === 'answer') post('answer', { sessionId: n.session.sessionId, askId: n.session.ask?.id ?? 'text', label }, key, card)
+  else if (w === 'gate') post('gate', { session: n.session.sessionId, plan: n.session.gate?.fp ?? '', action: label }, key, card)
+  else if (w === 'plan') { const ok = askable(S.board); if (ok.length) post('plan', { approve: ok }, key, card) }
+  else if (w === 'lot') post('lot', { lot: n.lot, action: 'done' }, key, card)
+}
+function replyOpen(on) {
+  const box = document.querySelector('#z-cards .zreply'); if (!box) return
+  box.hidden = !on; S.replying = on
+  if (on) box.querySelector('textarea').focus(); else document.activeElement?.blur()
+  $('z-dock').innerHTML = dockHTML(document.querySelector('#z-cards .zcard'), on)
+}
+function replySend() {
+  const n = cardNeed(), ta = document.querySelector('#z-cards .zreply textarea'), text = ta?.value.trim()
+  if (!n || !text) return
+  const card = n.id
+  if (n.why === 'waits') post('answer', { sessionId: n.session.sessionId, askId: n.session.ask?.id ?? 'text', label: text }, `answer:${card}:reply`, card)
+  else if (n.why === 'gate') post('gate', { session: n.session.sessionId, plan: n.session.gate?.fp ?? '', action: 'change', text }, `gate:${card}:change`, card)
+  else if (n.why === 'plan') post('plan', { change: { lot: askable(S.board)[0] ?? S.board.proposed[0], text } }, `plan:${card}:change`, card)
+  replyOpen(false)
+}
+const recommended = () => document.querySelector('#z-cards .zacts [data-w].rec') ?? document.querySelector('#z-cards .zacts .rec')
+
+// ---- Overview
+function select(n) { S.sel = String(n); render(); $('ck-list').querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' }) }
+function setDraft(where) { S.draft = { n: +S.sel, where, text: S.draft?.n === +S.sel ? S.draft.text : '' }; S.tab = 'ch'; render(); $('cr-text')?.focus() }
+function listToggle(on = !ck.classList.contains('list-off')) { ck.classList.toggle('list-off', on); $('ck-lt').textContent = on ? 'Show the list' : 'Hide the list'; LS.set('ck-list', on ? 'off' : 'on') }
+function treeToggle(on) { ck.classList.toggle('gt-open', on); $('ck-gtree').hidden = !on; $('ck-gt').setAttribute('aria-expanded', String(on)); $('ck-gt').textContent = on ? 'Collapse' : 'Expand the git tree'; if (on) drawTree() }
+function menuOpen(on) { $('pj-menu').hidden = !on; $('pj-btn').setAttribute('aria-expanded', String(on)); if (on) $('pj-menu').querySelector('[aria-checked="true"]')?.focus() }
+
+// ---- the phone (lot 67): mockups/phone, below 600 px wide (or under 480 px high: a phone held sideways). Its own layer, drawn
+// from the same Board, the same needs and the same writes as the desktop; the desktop views are hidden, so the git tree, the
+// rail, the notes and every key chip are gone. Review is the home screen (Needs); Tasks answers "does it run, what moves".
+const PHONE = matchMedia('(max-width: 599px), (max-height: 480px) and (max-width: 932px)')
+const P = { tab: null, open: null, sheet: null, fold: { next: false, done: false }, filter: 'all', toast: null, swiped: null, stage: null, replyOpen: false }
+// Snoozed needs, per device: { id: until }. A need whose time has come shows again, tagged "snoozed", until it closes.
+const SNZ_KEY = 'overseer.snooze'
+const snoozes = () => { try { return JSON.parse(localStorage.getItem(SNZ_KEY) || '{}') } catch { return {} } }
+const setSnoozes = m => { try { localStorage.setItem(SNZ_KEY, JSON.stringify(m)) } catch {} }
+const snoozeTimes = t => { const d = new Date(t), eve = new Date(d); eve.setHours(19, 0, 0, 0); if (eve <= d) eve.setDate(eve.getDate() + 1); const mor = new Date(d); mor.setDate(mor.getDate() + 1); mor.setHours(9, 0, 0, 0); return [['1 h', 'snooze', t + 3600e3], [clock(eve.getTime()), 'evening', eve.getTime()], ['9:00', 'tomorrow', mor.getTime()]] }
+const SNZ_TAG = 12 * 3600e3 // a need's id is its session: a later question of that session is not "snoozed"
+const phoneNeeds = () => { const m = snoozes(), t = now(); return openNeeds().filter(n => !(m[n.id] > t)).map(n => ({ ...n, snoozed: m[n.id] !== undefined && t - m[n.id] < SNZ_TAG })) }
+const snoozedNow = () => { const t = now(); return Object.values(snoozes()).filter(u => u > t).length }
+const backAt = () => { const m = snoozes(), t = now(), ids = new Set(needs().map(n => n.id)); const ahead = Object.entries(m).filter(([id, u]) => u > t && ids.has(id)).map(([, u]) => u).sort((a, b) => a - b); return { n: ahead.length, next: ahead[0] } }
+const whenText = at => { const d = new Date(at), t = new Date(); return d.toDateString() === t.toDateString() ? clock(at) : `tomorrow ${clock(at)}` }
+const PI = { needs: '<path d="M4 13h4l2 3h4l2-3h4"/><path d="M5 5h14l1 8v6H4v-6z"/>', tasks: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>', activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>' }
+const KIND_ICO = { waits: ['wait', ''], gate: ['act', 'act'], plan: ['todo', ''], blocked: ['act', 'act'], stuck: ['act', 'act'], budget: ['wait', ''], stale: ['wait', ''] }
+const KIND_WORD = { waits: 'Question', gate: 'Approval', plan: 'Plan', blocked: 'Blocked', stuck: 'Stuck', budget: 'Budget', stale: 'Overseer' }
+const needMeta = (b, n) => n.why === 'waits' ? (n.session.recommend ? `Recommends: ${n.session.recommend.option}` : n.session.label) : n.why === 'gate' ? `${n.session.gate?.agents?.length ?? 0} agents · ${n.session.label}` : n.why === 'blocked' ? 'Every task after it waits' : n.why === 'plan' ? `${b.proposed.length} tasks` : n.head
+const eyebrowOf = n => [KIND_WORD[n.why], n.lot !== undefined ? `task ${n.lot}` : '', n.session?.label].filter(Boolean).join(' · ')
+
+function phoneTopHTML(b, t) {
+  if (!b) return `<header class="pp-top"><span class="pp-pj">Overseer</span><span class="pp-live off"><span class="dot"></span>${S.connected ? 'waiting' : 'disconnected'}</span></header>`
+  const pill = pillOf(b, t, S.connected), p = passOf(b, t)
+  return `<header class="pp-top"><button type="button" class="pp-pj" data-pp="menu" aria-haspopup="menu" aria-label="Switch project">${h(repoName(b.repo))} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button type="button" class="pp-live${pill.off ? ' off' : ''}" data-pp="run" aria-label="Sessions and budget"><span class="dot"></span>${h(pill.text)} <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="trk" cx="12" cy="12" r="9"/><circle class="arc" cx="12" cy="12" r="9" pathLength="100" stroke-dasharray="${p.arc} 100"/></svg><span class="mono" style="color:var(--ink)">${p.text}</span></button></header>`
+}
+function phoneSheetHTML(b, t) {
+  if (P.sheet === 'menu') return `<div class="pp-sheet" role="menu"><span class="pp-eye">Projects</span>${(S.boards.length ? S.boards : [{ slug: S.slug, repo: b.repo }]).map(x => `<button type="button" role="menuitemradio" aria-checked="${x.slug === S.slug}" data-pp-board="${h(x.slug)}"><b>${h(repoName(x.repo))}</b>${x.stale ? ' · silent' : ''}</button>`).join('')}<div data-notify-slot></div></div>`
+  if (P.sheet === 'run') {
+    const bud = b.budget, busy = (b.sessions ?? []).filter(s => WORKING.includes(s.stage))
+    return `<div class="pp-sheet"><span class="pp-eye">Sessions · ${busy.length} of ${(b.sessions ?? []).length} busy</span>${(b.sessions ?? []).map(s => `<span><b>${h(s.label)}</b> · ${h(s.stage)}${s.lot !== undefined ? ` · task ${s.lot}` : ''}</span>`).join('') || '<span>No session watched.</span>'}
+      <span class="pp-eye" style="margin-top:6px">Budget</span><span>${bud ? `<b>${bud.spent.toFixed(1)} of ${bud.budget}</b> weekly-limit points` : NX}</span>${enabled() ? `<div class="pp-row3"><button type="button" class="pp-btn" data-w="pass">Pass now</button><button type="button" class="pp-btn" data-w="run">${b.paused ? 'Resume' : 'Pause'}</button></div>` : ''}</div>`
+  }
+  if (P.sheet === 'notes') return `<div class="pp-sheet">${railNotes(b).replace(/<span/g, '<span style="display:block"') || 'No note.'}</div>`
+  return ''
+}
+function phoneNeedsHTML(b, t) {
+  const list = phoneNeeds(), later = backAt(), oldest = list.reduce((m, n) => Math.max(m, n.age ?? 0), 0)
+  const rows = list.map(n => { const [ic, cls] = KIND_ICO[n.why] ?? ['wait', '']; return `<div class="pp-sw${P.swiped === n.id ? ' open' : ''}" data-need="${h(n.id)}">
+      <button type="button" class="pp-row" data-pp-open="${h(n.id)}"><span class="pp-ico ${cls}">${sico(ic)}</span><span style="flex:1;min-width:0"><span class="pp-kind">${h(eyebrowOf(n))}${n.snoozed ? '<span class="pp-tag">snoozed</span>' : ''}</span><span class="pp-what">${rich(n.title)}</span><span class="pp-meta">${rich(needMeta(b, n))}</span></span><span class="pp-age">${n.age !== undefined ? ago(n.age) : ''}</span></button>
+      <div class="pp-snz">${snoozeTimes(t).map(([v, w, at]) => `<button type="button" data-pp-snooze="${at}" aria-label="Snooze until ${h(whenText(at))}"><b>${v}</b>${w}</button>`).join('')}</div></div>` }).join('')
+  return `<div class="pp-scr"><h1 class="pp-h1">Needs</h1><p class="pp-sub">${list.length ? `${list.length} open${oldest ? ` · the oldest waits ${ago(oldest)}` : ''}` : 'Nothing needs you.'}</p>
+    <div class="pp-list">${rows}</div>${list.length ? '<p class="pp-meta" style="margin:8px 4px 0">Swipe a need to the left to snooze it.</p>' : ''}
+    <div class="pp-later">${sico('wait')}${later.n ? `Snoozed · ${later.n} · back at ${h(whenText(later.next))}` : 'Snoozed · none'}</div></div>`
+}
+function phoneTaskCardHTML(b, l, t) {
+  const s = sessionOf(b, l), marks = marksOf(l), met = (marks ?? []).filter(m => m.mark === 'met').length, t0 = s?.lotStartedAt
+  const el = t0 ? t - t0 : 0, long = !!(t0 && b.pace && el > 2 * b.pace), pct = b.pace && t0 ? Math.min(100, el / (2 * b.pace) * 100) : 0
+  return `<button type="button" class="pp-card" data-pp-task="${l.n}"><span class="pp-l1"><span class="pp-n mono">${l.n}</span><span class="pp-ttl">${rich(l.title)}</span></span>
+    <span class="pp-l2"><span>${s ? h(s.label) : l.status === 'blocked' ? 'blocked' : 'no session'}</span><span>${s ? h(s.stage) : h(l.note ?? '')}</span>${t0 ? `<span class="mono">${ago(el)}${b.pace ? ` of ${ago(b.pace)}` : ''}</span>` : ''}<span>${marks ? `${met} of ${marks.length} met` : 'marks not exported yet'}</span><span>${h(wfStep(b, s))}</span></span>
+    ${t0 && b.pace ? `<span class="pp-bar${long ? ' long' : ''}" role="meter" aria-label="Elapsed against the run's median" aria-valuenow="${Math.round(el / 1000)}"><i style="width:${pct.toFixed(1)}%"></i><b style="left:50%" title="the median"></b></span>` : ''}</button>`
+}
+function phoneTasksHTML(b, t) {
+  const ns = needs(), g = groupLots(b, ns), nowL = [...g.needs, ...g.now].filter(l => l.status === 'running' || l.status === 'blocked'), next = [...g.needs.filter(l => !nowL.includes(l)), ...g.next, ...g.planned.filter(l => !(b.proposed ?? []).includes(l.n))], bud = b.budget
+  const busy = (b.sessions ?? []).filter(s => WORKING.includes(s.stage)).length, notes = railNotes(b).split('</span>').filter(x => x.trim()).length
+  const mini = l => `<button type="button" class="pp-mini" data-pp-task="${l.n}"><span class="pp-n mono">${l.n}</span><span style="flex:1;min-width:0">${rich(l.title)}</span>${l.status === 'done' ? sico('done') : ''}</button>`
+  return `<div class="pp-scr"><h1 class="pp-h1">Tasks</h1><p class="pp-sub">${g.done.length} of ${(b.lots ?? []).length} done${leftOf(b, t) ? ` · ${h(leftOf(b, t))}` : ''}</p>
+    ${(b.lots ?? []).length ? '' : '<p class="pp-empty">No tasks yet: write PLAN.md, then run /oversee run.</p>'}
+    <section aria-label="Now">${nowL.length ? `<div class="pp-sec">Now <span>${nowL.length}</span></div>${nowL.map(l => phoneTaskCardHTML(b, l, t)).join('')}` : ''}</section>
+    ${(b.proposed ?? []).length ? `<div class="pp-sec">Proposed <span>${b.proposed.length}</span></div><div class="pp-prop" data-z="plan"><span>Tasks ${b.proposed[0]} to ${b.proposed[b.proposed.length - 1]} wait for your approval.${notYet(b).length ? ` ${notYet(b).join(', ')}: not in the plan yet.` : ''}</span><div class="pp-row3">${askable(b).length ? `<button type="button" class="pp-btn go" data-w="plan" data-label="approve">Approve all</button>` : ''}<button type="button" class="pp-btn" data-pp-open="plan">Review</button></div></div>` : ''}
+    <details class="pp-fold"${P.fold.next ? ' open' : ''} data-pp-fold="next"><summary>Next <span class="mono">${next.length}</span></summary>${next.map(mini).join('')}</details>
+    <details class="pp-fold"${P.fold.done ? ' open' : ''} data-pp-fold="done"><summary>Done <span class="mono">${g.done.length}</span></summary>${g.done.map(mini).join('')}</details>
+    <button type="button" class="pp-run" data-pp="run" style="margin-top:14px"><span><b class="mono">${busy}/${(b.sessions ?? []).length}</b> sessions busy</span><span class="pp-meter"><i style="width:${bud ? Math.min(100, Math.round(bud.spent / bud.budget * 100)) : 0}%"></i></span><span>${bud ? `<b class="mono">${bud.spent.toFixed(1)}/${bud.budget}</b> pts` : NX}</span></button>
+    ${notes ? `<button type="button" class="pp-btn" data-pp="notes" style="width:100%">${notes} note${notes === 1 ? '' : 's'}</button>` : ''}</div>`
+}
+function phoneActivityHTML(b) {
+  const isDone = f => ['done', 'blocked', 'retry'].includes(f.action), isYou = f => f.action === 'decided'
+  const rows = [...(b.feed ?? [])].sort((x, y) => y.at - x.at).filter(f => P.filter === 'all' || (P.filter === 'done' ? isDone(f) : isYou(f)))
+  let day = ''
+  const items = rows.map(f => { const d = new Date(f.at).toDateString(), head = d !== day ? `<p class="pp-day">${d === new Date().toDateString() ? 'Today' : h(new Date(f.at).toLocaleDateString())}</p>` : ''; day = d
+    return `${head}<div class="pp-e"><span class="k ${isYou(f) ? 'you' : f.action === 'done' ? 'done' : f.action === 'blocked' ? 'act' : ''}"></span><div><div class="w"><b>${h(f.label)}</b> ${h(f.action)}: ${rich(f.text)}</div><div class="m">${clock(f.at)}</div></div></div>` }).join('')
+  return `<div class="pp-scr"><h1 class="pp-h1">Activity</h1><div class="pp-chips" role="group" aria-label="Filter">${[['all', 'All'], ['done', 'Done and verdicts'], ['you', 'Your actions']].map(([k, t]) => `<button type="button" class="pp-chip" data-pp-filter="${k}" aria-pressed="${P.filter === k}">${t}</button>`).join('')}</div>${items || '<p class="pp-empty">Nothing yet.</p>'}</div>`
+}
+function phoneTaskHTML(b, l, t) {
+  const s = sessionOf(b, l), marks = marksOf(l), met = (marks ?? []).filter(m => m.mark === 'met').length, crit = criteriaOf(l), t0 = s?.lotStartedAt
+  const el = t0 ? t - t0 : 0, long = !!(t0 && b.pace && el > 2 * b.pace), c = l.check, dirty = l.dirty ?? [], tot = l.stat
+  const tab = P.stage ?? defaultStage(b, l, t)
+  const tiles = [
+    `<div class="pp-k"><b>${t0 ? ago(el) : '—'}</b><span>${t0 ? (b.pace ? `of ${ago(b.pace)} usual${long ? ' · longer than usual' : ''}` : 'elapsed') : l.status === 'done' ? 'done' : 'not started'}</span>${t0 && b.pace ? `<span class="pp-bar${long ? ' long' : ''}"><i style="width:${Math.min(100, el / (2 * b.pace) * 100).toFixed(1)}%"></i><b style="left:50%"></b></span>` : ''}</div>`,
+    `<div class="pp-k"><b>${marks ? `${met}/${marks.length}` : '—'}</b><span>${marks ? 'criteria met' : 'marks not exported yet'}</span>${marks ? `<span class="pp-segs">${marks.map(m => `<i class="${m.mark}"></i>`).join('')}</span>` : ''}</div>`,
+    `<div class="pp-k"><b>${c && typeof c === 'object' ? (c.ok ? 'pass' : 'fail') : '—'}</b><span>${c && typeof c === 'object' ? `last test · ${ago(t - c.at)} ago` : typeof c === 'string' ? 'not run yet' : 'not exported yet'}</span></div>`,
+    `<div class="pp-k"><b>${tot ? tot.files : dirty.length || (l.files ?? []).length || '—'}</b><span>${tot ? `files · +${tot.add} −${tot.del}` : dirty.length ? 'not committed' : 'changes'}</span></div>`]
+  return `<div class="pp-head"><button type="button" class="pp-back" data-pp="back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Back</button></div>
+    <div class="pp-body"><span class="pp-n mono">Task ${l.n} · ${h(l.status)}</span><h2 class="pp-t">${rich(l.title)}</h2><span class="pp-meta">${s ? `${h(s.label)} · ${h(s.stage)} · try ${s.tries + 1}` : h(subOf(b, l, t))}</span>
+    <div class="pp-kv">${tiles.join('')}</div>
+    ${l.brief?.problem ? `<div class="pp-ctx">${rich(l.brief.problem)}</div>` : ''}
+    ${crit.length ? `<ul class="pp-crit">${crit.map((x, i) => `<li>${sico(marks?.[i]?.mark ?? 'todo')}<span>${rich(x)}</span></li>`).join('')}</ul>` : ''}
+    <div class="pp-segctl" role="tablist">${STG.map(([k, , name]) => `<button type="button" class="pp-tx" data-pp-stage="${k}" aria-pressed="${k === tab}">${name}</button>`).join('')}</div>
+    <div class="pp-stage" id="pp-stage"></div></div>`
+}
+function phoneCardHTML(b, n, list, t) {
+  const s = n.session, dis = enabled() ? '' : ' disabled', i = list.findIndex(x => x.id === n.id)
+  const w = Object.values(S.writes).filter(x => x.card === n.id).at(-1)
+  const head = `<div class="pp-head"><button type="button" class="pp-back" data-pp="back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Needs</button><span class="pp-pos" aria-label="${i + 1} of ${list.length}">${list.map((x, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</span></div>`
+  const state = w ? `<div class="pp-st ${w.state}"><span class="d"></span><span style="flex:1;min-width:0">${w.state === 'sent' ? `Sent${s ? ` to ${h(s.label)}` : ''}` : w.state === 'done' ? `Sent${s ? ` to ${h(s.label)}` : ''} · done` : `refused: ${h(w.why)}`}</span>${w.state === 'refused' ? `<button type="button" class="pp-x" data-clear-card="${h(n.id)}" aria-label="Clear this message">×</button>` : ''}</div>${w.state === 'done' ? `<button type="button" class="pp-btn go" data-pp="next">Next need</button>` : ''}` : ''
+  let body = '', dock = ''
+  if (n.why === 'waits') {
+    const opts = s.ask?.options ?? [], rec = s.recommend?.option?.toLowerCase(), isRec = o => rec && (o.toLowerCase() === rec || rec.startsWith(o.toLowerCase()) || o.toLowerCase().startsWith(rec))
+    body = `${s.recommend ? `<div class="pp-ctx"><b>Recommends:</b> ${rich(s.recommend.option)}${s.recommend.why ? ` — ${rich(s.recommend.why)}` : ''}</div>` : ''}${s.lastText ? `<div class="pp-ctx">${rich(s.lastText)}</div>` : ''}`
+    dock = `${opts.sort((a, c) => (isRec(c) ? 1 : 0) - (isRec(a) ? 1 : 0)).map(o => `<button type="button" class="pp-opt${isRec(o) ? ' rec' : ''}" data-w="answer" data-label="${h(o)}"${dis}>${h(o)}${isRec(o) ? '<small>recommended</small>' : ''}</button>`).join('')}
+      <form class="pp-reply" data-pp-reply><input aria-label="Your answer" placeholder="Answer in your words" ${dis}><button type="submit" class="pp-send" aria-label="Send"${dis}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>`
+  } else if (n.why === 'gate') {
+    const ag = s.gate?.agents ?? []
+    body = `<div class="pp-steps">${ag.map((a, j) => `<div class="pp-s"><span class="pp-n mono">${j + 1}</span><span><b>${h(a.label)}</b></span>${a.model ? `<span class="m">${h(a.model)}</span>` : ''}</div>`).join('') || `<div class="pp-s">${NX}</div>`}</div>`
+    dock = `${P.replyOpen ? `<form class="pp-reply" data-pp-reply style="flex-direction:column"><textarea aria-label="What to change"></textarea><button type="submit" class="pp-btn go"${dis}>Send the change</button></form>` : ''}<div class="pp-row3"><button type="button" class="pp-btn act" style="flex:2" data-w="gate" data-label="approve"${dis}>Approve</button><button type="button" class="pp-btn" data-pp="change"${dis}>Change</button><button type="button" class="pp-btn" data-w="gate" data-label="reject"${dis}>Reject</button></div>`
+  } else if (n.why === 'plan') {
+    body = `<div class="pp-props">${b.proposed.map(x => inPlan(b, x)
+      ? `<div class="pp-prow" data-task="${x}"><span class="pp-n mono">${x}</span><span class="pp-ptitle">${h(lotOf(b, x)?.title ?? x)}</span><div class="pp-row3"><button type="button" class="pp-btn act" data-w="plan" data-label="approve:${x}"${dis}>Approve</button><button type="button" class="pp-btn" data-w="plan" data-label="decline:${x}"${dis}>Not now</button></div></div>`
+      : `<div class="pp-prow" data-task="${x}"><span class="pp-n mono">${x}</span><span class="pp-ptitle">not in the plan yet</span></div>`).join('')}</div>`
+    dock = askable(b).length > 1 ? `<button type="button" class="pp-opt rec" data-w="plan" data-label="approve"${dis}>Approve all</button>` : ''
+  } else {
+    body = n.cmd ? `<div class="pp-ctx"><code class="mono">${h(n.cmd)}</code></div>` : ''
+    dock = n.why === 'blocked' ? `<button type="button" class="pp-opt rec" data-w="lot" data-label="done"${dis}>Done</button>` : `<button type="button" class="pp-opt" data-pp="skip">Done</button>`
+  }
+  const l = n.lot !== undefined ? lotOf(b, n.lot) : undefined
+  const files = l ? [...(l.dirty ?? []).map(d => d.path), ...(l.files ?? []).map(f => f[2])] : []
+  return `<div class="pp-cardscr">${head}<article class="pp-body" data-z="${h(n.id)}" data-pp-card><span class="pp-eye">${h(eyebrowOf(n))}</span><h2 class="pp-q">${rich(n.title)}</h2>${body}${files.length ? `<div class="pp-ctx">${files.length} file${files.length === 1 ? '' : 's'} on this task: open the task for the diffs.</div>` : ''}</article>
+    <div class="pp-dock" data-z="${h(n.id)}">${state}${!w || w.state === 'refused' ? dock : ''}</div></div>`
+}
+
+function renderPhone() {
+  const root = $('phone')
+  document.documentElement.classList.toggle('phone', PHONE.matches)
+  if (!PHONE.matches || !root) return
+  const b = S.board, t = now()
+  if (P.tab === null && b) P.tab = phoneNeeds().length ? 'needs' : 'tasks' // the phone opens on Needs, or on Tasks when nothing needs you
+  const tab = P.tab ?? 'needs'
+  let main = ''
+  if (!b) main = `<p class="pp-empty pp-scr">${S.connected ? 'Waiting for the first board…' : 'Disconnected: the board is not reachable.'}</p>`
+  else if (P.open?.kind === 'task' && lotOf(b, P.open.n)) main = phoneTaskHTML(b, lotOf(b, P.open.n), t)
+  else if (P.open?.kind === 'card') {
+    const list = phoneNeeds(), n = list.find(x => x.id === P.open.id) ?? needs().find(x => x.id === P.open.id)
+    main = n ? phoneCardHTML(b, n, list.some(x => x.id === n.id) ? list : [...list, n], t) : (P.open = null, phoneNeedsHTML(b, t))
+  } else main = tab === 'tasks' ? phoneTasksHTML(b, t) : tab === 'activity' ? phoneActivityHTML(b) : phoneNeedsHTML(b, t)
+  const count = b ? phoneNeeds().length : 0
+  const keepFocus = document.activeElement?.closest?.('#phone [data-pp-reply]') ? { v: document.activeElement.value } : null
+  P.snoozed = snoozedNow()
+  $('pj-menu').append($('pj-notify')) // the Notify me block lives in the project menu: on the phone it moves into the project sheet
+  root.innerHTML = `${phoneTopHTML(b, t)}${b ? phoneSheetHTML(b, t) : ''}<main>${main}</main>
+    ${P.toast ? `<div class="pp-toast" role="status">${h(P.toast.text)}<button type="button" data-pp="undo">Undo</button></div>` : ''}
+    <nav class="pp-tabs" aria-label="Sections">${[['needs', 'Needs'], ['tasks', 'Tasks'], ['activity', 'Activity']].map(([k, name]) => `<button type="button" class="pp-tab" data-pp-tab="${k}"${tab === k && !P.open ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${PI[k]}</svg>${k === 'needs' && count ? `<span class="pp-badge">${count}</span>` : ''}${name}</button>`).join('')}</nav>`
+  if (keepFocus) { const i = root.querySelector('[data-pp-reply] input, [data-pp-reply] textarea'); if (i) { i.value = keepFocus.v; i.focus() } }
+  root.querySelector('[data-notify-slot]')?.append($('pj-notify'))
+  // a card whose write is done: the next need comes, after a moment to read "done"
+  const doneW = P.open?.kind === 'card' && Object.values(S.writes).find(w => w.card === P.open.id && w.state === 'done')
+  if (doneW && P.nextFor !== P.open.id) { P.nextFor = P.open.id; const id = P.open.id; setTimeout(() => { if (P.open?.id === id) phoneNext(id) }, 1200) }
+  if (P.open?.kind === 'task' && b && lotOf(b, P.open.n)) mountPhoneStage(lotOf(b, P.open.n), P.stage ?? defaultStage(b, lotOf(b, P.open.n), t))
+  paintWrites()
+}
+async function mountPhoneStage(l, tab) {
+  const box = $('pp-stage'), name = stageName(tab)
+  if (!box) return
+  try {
+    modules[name] ??= await import(`/stages/${name}.js`)
+    if (box !== $('pp-stage')) return
+    const ctx = { lot: l, board: S.board, now: now(), esc: h, sico, slug: S.slug, rerender: () => renderPhone(), draft: () => {}, copy }
+    box.innerHTML = modules[name].render(ctx)
+    modules[name].attach?.(box, ctx)
+  } catch { box.innerHTML = NX }
+}
+// The × of a refused state clears it (a capture listener: the × sits inside the control that was refused, which must not send again)
+document.addEventListener('click', e => { const x = e.target.closest?.('.w-x[data-clear]'); if (!x) return; e.stopPropagation(); e.preventDefault(); delete S.writes[x.dataset.clear]; paintWrites() }, true)
+// A phone screen is a history entry: the back gesture (popstate) closes it, as the Back button does.
+function phoneOpen(o) { P.open = o; P.sheet = null; P.replyOpen = false; P.stage = null; try { history.pushState({ pp: 1 }, '') } catch {} ; renderPhone(); scrollTo(0, 0) }
+function phoneBack() { if (history.state?.pp) history.back(); else { P.open = null; renderPhone() } }
+addEventListener('popstate', () => { if (P.open) { P.open = null; P.replyOpen = false; renderPhone() } })
+function phoneNext(from) {
+  const list = phoneNeeds().filter(x => x.id !== from && !S.zdone.has(x.id))
+  P.replyOpen = false
+  if (list.length) { P.open = { kind: 'card', id: list[0].id }; renderPhone(); scrollTo(0, 0) } else phoneBack()
+}
+// What a phone card's control sends: the same POSTs and keys as Review, so resolveWrites and paintWrites hold for both.
+function phoneAct(btn) {
+  const id = btn.closest('[data-z]')?.dataset.z, n = needs().find(x => x.id === id), w = btn.dataset.w, label = btn.dataset.label
+  if (w === 'run') return void post('run', { paused: !S.board.paused }, 'run')
+  if (w === 'pass') return void post('pass', {}, 'pass')
+  if (!n) return
+  const key = `${w}:${id}:${label ?? ''}`
+  if (w === 'answer') post('answer', { sessionId: n.session.sessionId, askId: n.session.ask?.id ?? 'text', label }, key, id)
+  else if (w === 'gate') post('gate', { session: n.session.sessionId, plan: n.session.gate?.fp ?? '', action: label }, key, id)
+  else if (w === 'plan') { // approve / decline: one task ("approve:75") or, with no number, all that the plan holds
+    const [what, num] = String(label).split(':'), ok = askable(S.board), one = num ? [+num].filter(x => ok.includes(x)) : ok
+    if (one.length) post('plan', what === 'decline' ? { decline: one } : { approve: one }, key, id)
+  }
+  else if (w === 'lot') post('lot', { lot: n.lot, action: 'done' }, key, id)
+  renderPhone()
+}
+function phoneReply(form) {
+  const id = form.closest('[data-z]')?.dataset.z, n = needs().find(x => x.id === id), text = form.querySelector('input,textarea')?.value.trim()
+  if (!n || !text) return
+  if (n.why === 'waits') post('answer', { sessionId: n.session.sessionId, askId: n.session.ask?.id ?? 'text', label: text }, `answer:${id}:reply`, id)
+  else if (n.why === 'gate') post('gate', { session: n.session.sessionId, plan: n.session.gate?.fp ?? '', action: 'change', text }, `gate:${id}:change`, id)
+  P.replyOpen = false
+  renderPhone()
+}
+function snooze(id, until) {
+  const m = snoozes(), before = m[id], t = now()
+  for (const [k, u] of Object.entries(m)) if (t - u > SNZ_TAG) delete m[k]
+  m[id] = until; setSnoozes(m)
+  P.swiped = null
+  P.toast = { text: `Snoozed until ${whenText(until)}`, id, before }
+  clearTimeout(snooze.t); snooze.t = setTimeout(() => { P.toast = null; renderPhone() }, 6000)
+  renderPhone()
+}
+$('phone')?.addEventListener('click', e => {
+  const t = e.target, c = s => t.closest(s)
+  let x
+  if ((x = c('[data-clear-card]'))) { for (const [k, w] of Object.entries(S.writes)) if (w.card === x.dataset.clearCard && w.state === 'refused') delete S.writes[k]; return void renderPhone() }
+  if ((x = c('[data-pp-tab]'))) { P.tab = x.dataset.ppTab; P.open = null; P.sheet = null; P.swiped = null; renderPhone(); return void scrollTo(0, 0) }
+  if ((x = c('[data-pp-board]'))) { P.sheet = null; if (x.dataset.ppBoard !== S.slug) connect(x.dataset.ppBoard); return void renderPhone() }
+  if ((x = c('[data-pp-snooze]'))) return void snooze(x.closest('[data-need]').dataset.need, +x.dataset.ppSnooze)
+  if ((x = c('[data-pp-open]'))) { if (P.swiped) { P.swiped = null; return void renderPhone() } return void phoneOpen({ kind: 'card', id: x.dataset.ppOpen }) }
+  if ((x = c('[data-pp-task]'))) return void phoneOpen({ kind: 'task', n: +x.dataset.ppTask })
+  if ((x = c('[data-pp-stage]'))) { P.stage = x.dataset.ppStage; return void renderPhone() }
+  if ((x = c('[data-pp-filter]'))) { P.filter = x.dataset.ppFilter; return void renderPhone() }
+  if ((x = c('[data-w]'))) return void phoneAct(x)
+  if ((x = c('[data-pp]'))) {
+    const k = x.dataset.pp
+    if (k === 'menu' || k === 'run' || k === 'notes') P.sheet = P.sheet === k ? null : k
+    else if (k === 'back') return void phoneBack()
+    else if (k === 'next') return void phoneNext(P.open?.id)
+    else if (k === 'change') P.replyOpen = !P.replyOpen
+    else if (k === 'skip') { S.zdone.add(P.open.id); return void phoneNext(P.open.id) }
+    else if (k === 'undo' && P.toast) { const m = snoozes(); if (P.toast.before === undefined) delete m[P.toast.id]; else m[P.toast.id] = P.toast.before; setSnoozes(m); P.toast = null }
+    return void renderPhone()
+  }
+})
+$('phone')?.addEventListener('submit', e => { const f = e.target.closest('[data-pp-reply]'); if (f) { e.preventDefault(); phoneReply(f) } })
+$('phone')?.addEventListener('toggle', e => { const d = e.target; if (d.dataset?.ppFold) P.fold[d.dataset.ppFold] = d.open }, true)
+// Swipes: a need row slides left to show its snooze times; a card slides left or right to the next or previous need.
+{ let s = null
+  $('phone')?.addEventListener('pointerdown', e => { const row = e.target.closest('.pp-sw'), card = e.target.closest('[data-pp-card]'); if (row || card) s = { x: e.clientX, y: e.clientY, row, card } })
+  $('phone')?.addEventListener('pointermove', e => { if (!s?.row) return; const dx = e.clientX - s.x; if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - s.y)) s.row.querySelector('.pp-row').style.transform = `translateX(${Math.max(-216, Math.min(0, dx + (s.row.classList.contains('open') ? -216 : 0)))}px)` })
+  addEventListener('pointercancel', () => { if (s?.row) s.row.querySelector('.pp-row').style.transform = ''; s = null })
+  addEventListener('pointerup', e => {
+    if (!s) return
+    const dx = e.clientX - s.x, dy = e.clientY - s.y, horiz = Math.abs(dx) > 48 && Math.abs(dx) > 1.5 * Math.abs(dy)
+    if (s.row) { s.row.querySelector('.pp-row').style.transform = ''; if (horiz) { P.swiped = dx < 0 ? s.row.dataset.need : null; s.swiped = true; renderPhone() } }
+    else if (s.card && horiz) { const list = phoneNeeds(), i = list.findIndex(x => x.id === P.open?.id); if (list.length > 1 && i >= 0) { P.open = { kind: 'card', id: list[(i + (dx < 0 ? 1 : -1) + list.length) % list.length].id }; P.replyOpen = false; renderPhone() } }
+    const swiped = horiz; s = null
+    if (swiped) { const stop = ev => { ev.stopPropagation(); ev.preventDefault() }; addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => removeEventListener('click', stop, { capture: true }), 0) }
+  })
+}
+PHONE.addEventListener?.('change', () => { renderPhone(); if (!PHONE.matches) render() })
+function paintPhoneTop() { if (!PHONE.matches || !S.board) return; if (snoozedNow() !== P.snoozed) return void renderPhone(); const top = document.querySelector('#phone .pp-top'); if (top) top.outerHTML = phoneTopHTML(S.board, now()) }
+
+// ---- connection: /boards, then /events/<slug>
+let es = null
+function connect(slug) {
+  es?.close()
+  S.slug = slug; S.board = null; S.connected = false; S.sel = null
+  LS.set('overseer.board', slug)
+  fetch(`/board/${slug}`).then(r => (r.ok ? r.json() : null)).then(b => { if (b && S.slug === slug && !S.board) { S.board = b; resolveWrites(); render(); openPending() } }).catch(() => {}) // the first paint; the stream keeps it fresh
+  stream(slug)
+}
+function stream(slug) {
+  es?.close()
+  es = new EventSource(`/events/${slug}`)
+  es.onopen = () => { S.connected = true; render() }
+  es.onerror = () => { S.connected = false; paintTop(); paintWrites() }
+  es.onmessage = e => { try { S.board = JSON.parse(e.data); S.connected = true; resolveWrites(); render(); openPending() } catch {} }
+}
+// Chrome allows 6 HTTP/1.1 connections per host:port and an open stream holds one: a page that is gone or hidden lets its stream go (a 7th tab would never load).
+addEventListener('pagehide', () => { es?.close(); es = null })
+document.addEventListener('visibilitychange', () => { if (document.hidden) { es?.close(); es = null } else if (S.slug && !es) stream(S.slug) })
+async function loadBoards() {
+  let list = []
+  try { list = await (await fetch('/boards')).json() } catch {}
+  S.boards = list
+  if (!list.length) return
+  const want = S.slug ?? LS.get('overseer.board')
+  const slug = list.some(x => x.slug === want) ? want : list[0].slug // a saved board that is gone: the newest
+  if (slug !== S.slug) connect(slug); else if (S.board) paintMenu()
+}
+
+// ---- events
+document.addEventListener('click', e => {
+  const t = e.target, c = sel => t.closest(sel)
+  if (!c('.pj') && !$('pj-menu').hidden) menuOpen(false)
+  let x
+  if ((x = c('[data-view]'))) return void setView(x.dataset.view)
+  if (c('#pj-btn')) return void menuOpen($('pj-menu').hidden)
+  if ((x = c('[data-pj]'))) { menuOpen(false); if (x.dataset.pj !== S.slug) connect(x.dataset.pj); return }
+  if (c('#ck-live') && enabled()) return void post('run', { paused: !S.board.paused }, 'run')
+  if (c('#ck-pass') && enabled()) return void post('pass', {}, 'pass')
+  if ((x = c('.ck-review, .ck-need, .ck-ask [data-z]'))) return void openReview(+x.dataset.z || 0)
+  if ((x = c('.ck-row, .rl, .rn'))) return void select(x.dataset.n)
+  if ((x = c('[data-goto]'))) return void select(x.dataset.goto)
+  if ((x = c('[data-tab]'))) { S.tab = x.dataset.tab; return void render() }
+  if (c('#lb-more')) { S.full = !S.full; return void render() }
+  if (c('#ck-more')) { S.doneOpen = !S.doneOpen; LS.set('ck-done', S.doneOpen ? 'open' : 'folded'); return void render() }
+  if (c('#ck-lt')) return void listToggle()
+  if (c('#ck-gt')) return void treeToggle(!ck.classList.contains('gt-open'))
+  if (c('#cr-new, .hud-cr')) return void setDraft('')
+  if ((x = c('.hud-files [data-cr]'))) return void setDraft(x.dataset.cr)
+  if (c('#cr-cancel')) { S.draft = null; return void render() }
+  if (c('#z-back')) return void setView(S.back)
+  if ((x = c('#z-cards [data-act]'))) {
+    if (x.dataset.act === 'reply') replyOpen(true)
+    else if (x.dataset.act === 'copy') copy(x.dataset.cmd, x)
+    else if (x.dataset.act === 'skip') peel(cardNeed().id)
+    return
+  }
+  if ((x = c('#z-cards [data-w]'))) return void act(x)
+})
+document.addEventListener('input', e => { if (e.target.id === 'cr-text' && S.draft) S.draft.text = e.target.value })
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'cr-form') return
+  e.preventDefault()
+  const text = $('cr-text').value.trim(); if (!text || !S.draft) return
+  const [file, line] = (S.draft.where ?? '').split(/:(?=\d+$)/)
+  post('change', { lot: S.draft.n, text, ...(file ? { file } : {}), ...(line ? { line: +line } : {}) }, `change:${S.sel}`)
+})
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches?.('details[data-id]')) d.open ? S.openSteps.add(d.dataset.id) : S.openSteps.delete(d.dataset.id) }, true)
+
+// ---- keys: CONTRACT.md KEYS. j and k mean the same in both views (j next, k previous); Esc always means back or close.
+document.addEventListener('keydown', e => {
+  const t = e.target
+  if (e.defaultPrevented || e.isComposing) return
+  if (t.closest?.('textarea,input')) { // the text boxes: Esc closes, Enter sends (⌘Enter for a request)
+    if (t.id === 'cr-text') { if (e.key === 'Escape') { e.preventDefault(); S.draft = null; render() } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $('cr-form').requestSubmit() } }
+    else if (t.closest('.zreply')) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); replyOpen(false) } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); replySend() } }
+    return
+  }
+  if ((e.key === 'Enter' || e.key === ' ') && t.closest?.('button,a,summary,[role^=menuitem]')) return // a focused control acts by itself
+  if (e.key === 'Escape' && !$('pj-menu').hidden) { e.preventDefault(); menuOpen(false); $('pj-btn').focus(); return }
+  const k = e.key, meta = e.metaKey || e.ctrlKey
+  if (S.view === 'review') {
+    if (e.altKey || (meta && k !== 'Enter')) return
+    const card = document.querySelector('#z-cards .zcard'), hit = card && !meta ? card.querySelector(`[data-key="${k.toLowerCase()}"]`) : null
+    const run = k === 'Escape' ? () => (S.replying ? replyOpen(false) : setView(S.back))
+      : !openNeeds().length ? null
+      : k === 'ArrowRight' || k === 'j' ? () => move(1) : k === 'ArrowLeft' || k === 'k' ? () => move(-1)
+      : k === 'Enter' && meta ? () => recommended()?.click() : k === 'Enter' ? () => replyOpen(true)
+      : k === ',' || k === '.' ? () => { const f = [...document.querySelectorAll('#z-cards [data-file]')]; if (f.length) { S.file = (S.file + (k === '.' ? 1 : -1) + f.length) % f.length; f.forEach((x, i) => { x.hidden = i !== S.file }); $('z-file').textContent = S.file + 1 } }
+      : hit ? () => hit.click() : null
+    if (run) { e.preventDefault(); run() }
+    return
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return
+  const g = groupLots(S.board ?? { lots: [] }, needs()), order = listOrder(g).concat(S.doneOpen ? g.done : []).map(l => String(l.n)), i = order.indexOf(S.sel)
+  const run = k === 'ArrowDown' || k === 'j' ? () => order.length && select(order[(i + 1) % order.length])
+    : k === 'ArrowUp' || k === 'k' ? () => order.length && select(order[(i - 1 + order.length) % order.length])
+    : 'wct'.includes(k) && k.length === 1 ? () => { S.tab = { w: 'wf', c: 'ch', t: 'te' }[k]; render() }
+    : k === 'Enter' ? () => { const n = needs().findIndex(x => x.lot === +S.sel && ['waits', 'gate', 'blocked'].includes(x.why)); if (n >= 0) openReview(n) }
+    : k === '[' ? () => listToggle()
+    : k === 'g' ? () => treeToggle(!ck.classList.contains('gt-open'))
+    : k === 'p' ? () => menuOpen($('pj-menu').hidden)
+    : k === 'r' ? () => S.board && lotOf(S.board, +S.sel) && setDraft('')
+    : k === 'z' ? () => { S.ckZ = Date.now() } : k === 'm' && Date.now() - S.ckZ < 800 ? () => openReview(Math.max(0, needs().findIndex(n => !S.zdone.has(n.id))))
+    : null
+  if (run) { e.preventDefault(); run() }
+})
+
+// the version this server runs (GET /version), next to the overseer's (Board.mod.version)
+const version = async () => { try { const v = (await (await fetch('/version')).json()).version; if (v !== S.server) { S.server = v; if (S.board) render() } } catch {} }
+version(); setInterval(version, 30e3)
+
+// ---- lot 69: the phone. "Notify me" subscribes this browser (the service worker /sw.js) and sends the hours to the server, which pushes.
+let pendingNeed = null // a need to open once its board is here: from a push's link (#need=<kind:id>&slug=) or a message from the worker
+const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+const notifyState = t => { $('notify-state').textContent = t }
+const b64uBytes = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+const rid = () => crypto.randomUUID()
+const openPending = () => { if (!pendingNeed || !S.board) return; const key = pendingNeed; pendingNeed = null; const ex = (S.board.needs ?? []).find(x => `${x.kind}:${x.id}` === key); const i = ex ? needs().findIndex(n => String(n.id) === String(ex.id)) : -1; if (i >= 0) { if (PHONE.matches) phoneOpen({ kind: 'card', id: String(ex.id) }); else openReview(i) } } // at phone width the card lives in #phone; the key is the server's kind:id; the page's list names the same need by its id
+async function notifyMe() {
+  try {
+    if (!PUSH_OK) return notifyState('This browser cannot take notifications here')
+    if ((await Notification.requestPermission()) !== 'granted') return notifyState('Notifications are off for this site')
+    const reg = await navigator.serviceWorker.ready
+    const { key } = await (await fetch('/push/key')).json()
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(key) })
+    const r = await fetch('/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: rid(), subscription: sub.toJSON() }) })
+    notifyState(r.status === 202 ? 'Notifications on' : 'Could not turn notifications on')
+  } catch { notifyState('Could not turn notifications on') }
+}
+async function saveHours() {
+  const from = $('quiet-from').value, to = $('quiet-to').value
+  try {
+    const r = await fetch('/push/schedule', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: rid(), hours: from && to ? { from, to } : null }) })
+    notifyState(r.status === 202 ? 'Hours saved' : 'Could not save the hours')
+  } catch { notifyState('Could not save the hours') }
+}
+if (PUSH_OK) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data?.need) { pendingNeed = e.data.need; if (e.data.slug && e.data.slug !== S.slug) connect(e.data.slug); openPending() } })
+} else $('notify-btn').disabled = true
+$('notify-btn').addEventListener('click', notifyMe)
+for (const id of ['quiet-from', 'quiet-to']) $(id).addEventListener('change', saveHours)
+fetch('/push/key').then(r => r.json()).then(({ hours }) => { if (hours) { $('quiet-from').value = hours.from; $('quiet-to').value = hours.to } }).catch(() => {})
+
+// ---- start
+if (LS.get('ck-list') === 'off') listToggle(true)
+const link = new URLSearchParams(location.hash.slice(1)) // a push's link: #need=<kind:id>&slug=<slug> (sw.js)
+if (link.get('need')) { pendingNeed = link.get('need'); if (link.get('slug')) connect(link.get('slug')) }
+setView(location.hash === '#review' ? 'review' : 'cockpit') // read the link first: setView rewrites the hash
+setInterval(() => { if (S.board) { paintTop(); paintPhoneTop() } }, 1000) // the pass ring and the silent check
+renderPhone()
+setInterval(() => { if (S.board && document.activeElement?.tagName !== 'TEXTAREA') render() }, 30e3) // the ages move on without a new board
+loadBoards()
+setInterval(loadBoards, 30e3)
+</script>

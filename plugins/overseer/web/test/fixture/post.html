@@ -1,0 +1,10 @@
+<!doctype html>
+<title>fixture</title>
+<style>#send{display:inline-block;padding:8px 16px}</style>
+<button id="send" type="button">keep them</button>
+<script>
+document.getElementById('send').onclick = async () => {
+  await fetch('/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug: 'x', id: 'q1', label: 'keep them' }) })
+  document.title = 'sent'
+}
+</script>

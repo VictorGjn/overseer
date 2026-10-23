@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/workflow-plan-gate.mjs", "pre-tool"],
+            "timeout": 900,
+            "statusMessage": "Workflow plan-gate: waiting for your decision in the browser (Approve & run, or Cancel)…"
+          }
+        ]
+      },
+      {
+        "matcher": "CronCreate|ScheduleWakeup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/workflow-plan-gate.mjs", "schedule-guard"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/workflow-plan-gate.mjs", "prompt"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/workflow-plan-gate.mjs", "session-start"],
+            "timeout": 10,
+            "statusMessage": "Loading workflow-gate banner..."
+          }
+        ]
+      }
+    ]
+  }
+}

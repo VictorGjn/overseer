@@ -1,0 +1,10 @@
+/PLAN.md
+/DECISIONS.md
+EXPLORE.md
+/PLAN-*.md
+mockups/phone
+.types
+node_modules
+.DS_Store
+plugins/*/.claude-plugin/types/
+plugins/*/tsconfig.json

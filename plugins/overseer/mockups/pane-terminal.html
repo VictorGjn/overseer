@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overseer pane in the terminal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121418}
+.l{white-space:pre;min-height:21px}
+.d{color:#9aa1ad}.a{color:#dc8c81}.w{color:#dcc188}.o{color:#98c5a0}.i{color:#86b2cc}.p{color:#ada3d3}.b{font-weight:600}
+</style>
+</helmet>
+<div style="width: 960px; height: 640px; box-sizing: border-box; padding: 28px 32px; background: #121418; color: #dfe2e7; font: 14px/21px 'IBM Plex Mono', ui-monospace, monospace; display: flex; flex-direction: column; gap: 14px; overflow: hidden">
+
+<div style="display: flex; justify-content: space-between; align-items: center">
+<div class="l"><span style="background: #dc8c81; color: #121418; font-weight: 600"> OVERSEER </span> <span class="b">Fleet alerts v2</span>  <span class="d">next pass in 2m10</span></div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="font: inherit; background: #ada3d3; color: #121418; border: 0; border-radius: 4px; padding: 0 10px">Pass now <span style="opacity: .7">p</span></button>
+<button type="button" style="font: inherit; background: none; color: #dfe2e7; border: 1px solid #3a3f49; border-radius: 4px; padding: 0 10px">Log <span class="d">l</span></button>
+<button type="button" style="font: inherit; background: none; color: #dfe2e7; border: 1px solid #3a3f49; border-radius: 4px; padding: 0 10px">More <span class="d">f</span></button>
+</div>
+</div>
+
+<div style="border: 1px solid #6b4642; border-radius: 6px; padding: 10px 14px; position: relative">
+<span class="a b" style="position: absolute; top: -11px; left: 12px; background: #121418; padding: 0 6px">FOCUS</span>
+<div class="l"><span class="a b">▶ NEXT  </span><span class="b">Answer worker-8f (lot 2): “Keep the legacy route endpoint?”</span></div>
+<div class="l"><span class="d">        recommends: </span>keep it behind a flag, the mobile app still calls it</div>
+<div class="l"><span class="d">        blocks lots 4, 7 · waited 6m00</span></div>
+<div class="l"> </div>
+<div class="l"><span class="i">● NOW   </span>4/9 lots · 2 working · 1 free <span class="d">· about 1h20 left</span></div>
+<div class="l"><span class="o">✓ DONE  </span><span class="o">lot 1 Alert model · lot 3 Webhook retry</span></div>
+<div class="l"><span class="d">  THEN  1. </span>Unblock lot 7 (Data export): needs staging DB access</div>
+<div class="l"><span class="d">        2. </span><span class="w">Look at worker-a1: a tool call has waited 11m</span></div>
+</div>
+
+<div>
+<div class="l"><span class="d">PROGRESS </span><span class="o">▰▰▰▰▰▰▰▰</span><span class="w">▰▰▰▰</span><span class="d">▱▱▱▱</span><span class="a">▰▰</span> <span class="d">4/9 lots  </span><span class="w">◐2</span> <span class="d">○2</span> <span class="a">!1</span></div>
+</div>
+
+<div>
+<div class="l"><span class="a">?</span> worker-8f   <span class="d">lot 2 Escort route      → NEXT</span></div>
+<div class="l"><span class="w">◍</span> worker-a1   <span class="d">lot 5 Fleet digest      tool call 11m</span></div>
+<div class="l"><span class="d">○ free: worker-c3</span></div>
+</div>
+
+<div>
+<div class="l"><span class="w">◐</span> 2 Escort route    <span class="d">done when: escort.spec passes</span></div>
+<div class="l"><span class="w">◐</span> 5 Fleet digest    <span class="d">done when: digest renders for 3 fleets</span></div>
+<div class="l"><span class="a">!</span> 7 Data export     <span class="d">needs staging DB access</span></div>
+<div class="l"><span class="o">✓ 4 done</span>  <span class="d">· More (f) for verdicts, the lots graph and the branches</span></div>
+</div>
+
+<div class="l"><span class="d">branches  3 ahead of main · no conflict · </span><span class="w">1 worktree, 5 uncommitted</span></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":640}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

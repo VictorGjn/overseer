@@ -1,0 +1,2 @@
+// examples/sample-repo/PLAN.md as one string (a test has no fs); readme.test.sh checks the two stay equal.
+export default "# Plan — Sample: a tiny greeting CLI\n\n## [ ] 1. Add the hello command\ndone when: `node cli.js hello` prints \"Hello, world\"\ncheck: ./check.sh\n\n## [ ] 2. Add a --name flag\ndone when: `node cli.js hello --name Ada` prints \"Hello, Ada\"\ncheck: ./check.sh name\ndepends: 1\n\n## [ ] 3. Document both commands\ndone when: README.md shows both commands\ndepends: 2\n"

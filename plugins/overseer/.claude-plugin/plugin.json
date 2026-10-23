@@ -1,0 +1,34 @@
+{
+  "name": "overseer",
+  "version": "0.4.2",
+  "description": "Overseer: /oversee runs the project's PLAN.md through the Claude sessions you pick: it gives them tasks, judges their work, keeps a weekly-limit budget, answers what they wait on and nudges stalled ones. It never starts a session.",
+  "author": { "name": "Victor Grosjean" },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "model": {
+      "type": "string",
+      "title": "Overseer model",
+      "description": "Model that reads the sessions and writes the messages",
+      "default": "sonnet"
+    },
+    "everyMinutes": {
+      "type": "number",
+      "title": "Pass interval (minutes)",
+      "description": "How often the overseer reads the other sessions",
+      "default": 3
+    },
+    "leadModel": {
+      "type": "string",
+      "title": "Lead model",
+      "description": "Model that judges finished tasks against the plan",
+      "default": "opus"
+    },
+    "planFile": {
+      "type": "string",
+      "title": "Plan file",
+      "description": "The plan, at the repository's top",
+      "default": "PLAN.md"
+    }
+  }
+}
