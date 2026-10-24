@@ -10,7 +10,8 @@ import { browserTest } from './test/cdp.mjs'
 const { skip } = browserTest()
 // the contract: PNG at most 300 KB, GIF at most 3 MB
 const PNG_MAX = 300 * 1024, GIF_MAX = 3 * 1024 * 1024
-const FILES = ['board-light.png', 'board-dark.png', 'needs-you.png', 'zen.png', 'activity.png', 'gate.png', 'budget.png', 'phone-needs.png', 'phone-tasks.png', 'phone-activity.png', 'hero.gif', 'zen.gif', 'phone.gif']
+const FILES = ['board-light.png', 'board-dark.png', 'needs-you.png', 'zen.png', 'activity.png', 'gate.png', 'budget.png', 'phone-needs.png', 'phone-tasks.png', 'phone-activity.png', 'hero.gif', 'zen.gif', 'phone.gif',
+  'gate-review.png', 'gate-models.png', 'gate-live.gif', 'gate-learn.png', 'gate-history.png', 'gate-orchestrator.png'] // the last six: the /gate terminal and the history page
 
 test('shots.mjs makes every image of the contract, each within its size limit', { skip, timeout: 240000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'ov-shots-test-'))

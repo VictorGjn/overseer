@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate and test the three plugins, then type-check overseer against the types Claude Code generates. Exit 0 = everything holds.
+# Validate and test the three plugins, then type-check the mods against the types Claude Code generates. Exit 0 = everything holds.
 #   UPDATE_GOLDEN=1 ./check.sh        rewrite the reference screens a test found changed
 #   OVERSEER_DENYLIST=<file> ./check.sh   also scan for the names in that file (keep the file outside the repo)
 set -uo pipefail
@@ -69,7 +69,7 @@ done
 # check-watch.sh itself: a hung file gives the diagnostic then a fail, a slow file that works does not fail.
 if node --test check-watch.test.mjs >/dev/null 2>&1; then echo "watch ✔ check-watch.test.mjs"; else echo "watch ✘ check-watch.test.mjs"; fail=1; fi
 
-# The scan, the scan's own test, the README test and the clean-config install (item 2: marketplace add, install both, exactly 2 listed, TYPESAFE_API_KEY unset).
+# The scan, the scan's own test, the README test and the clean-config install (item 2: marketplace add, install the 3 plugins, exactly 3 listed, TYPESAFE_API_KEY unset).
 for s in scan.sh scan.test.sh readme.test.sh install.test.sh; do
   if o=$(./$s 2>&1); then echo "$s ✔ $(tail -1 <<<"$o")"; else echo "$s ✘"; sed 's/^/    /' <<<"$o" | tail -25; fail=1; fi
 done

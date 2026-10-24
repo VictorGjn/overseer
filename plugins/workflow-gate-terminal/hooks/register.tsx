@@ -890,7 +890,7 @@ async function dropMission($: EngineInterface, label: string) {
 }
 
 let isRetro = false
-// Once every agent has ended and nothing new started for 15 s: Opus judges the run, card by card and
+// Once the run is over (isRunOver): Opus judges the run, card by card and
 // flag by flag, and the verdicts feed each label's track record.
 async function retro($: EngineInterface) {
   const r = await read($, run)
@@ -1498,7 +1498,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column">
           {tabs}
           <Text bold>Retros · {retros.length} run{retros.length === 1 ? '' : 's'} judged by Opus</Text>
-          {retros.length ? null : <Text dimColor>No retro yet: one is written 15 s after a run's last agent ends, while this session is open.</Text>}
+          {retros.length ? null : <Text dimColor>No retro yet: one is written when the run ends (its task reports back, or no agent has run for 2 min), while this session is open.</Text>}
           {retros.map(([id, x]) => (
             <Box key={`rt-${id}`} flexDirection="column">
               <Box>
