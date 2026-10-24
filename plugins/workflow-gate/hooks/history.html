@@ -97,7 +97,7 @@
   </span>
   <span class="meta" id="hdr">loading…</span>
   <span class="search" id="searchbox" hidden>
-    <input id="q" placeholder="company brain, anabasis, PRD-132…" autocomplete="off">
+    <input id="q" placeholder="a project, a ticket, a feature…" autocomplete="off">
     <button id="go">Find</button>
   </span>
   <span style="flex:1"></span>
@@ -276,8 +276,8 @@ async function saveNote(runId, label, verdict, text) {
 }
 
 // ---------------------------------------------------------------- thread view
-// A session's title almost never names its subject: the densest "company brain" session on this
-// machine — 148 mentions — is called "Let's surface the billing automations work". So the thread is
+// A session's title almost never names its subject: the densest session on a topic often has a title
+// about something else entirely. So the thread is
 // assembled by searching the text of everything, and the handoffs carry the part that exists nowhere
 // else: what was decided, and what must not be tried again.
 function showTab(which) {

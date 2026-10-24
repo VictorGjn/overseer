@@ -1,7 +1,7 @@
 // Picking a project back up after six weeks, without reading six weeks of transcripts.
 //
 // The thread of a piece of work is already on disk, in four places that nothing joins: the session
-// transcripts, the handoffs, the memories, and the Linear hook's state. Measured on "company brain":
+// transcripts, the handoffs, the memories, and the Linear hook's state. Measured on a busy topic:
 // 14 sessions mention it, 7 handoffs cover it, 38 memories touch it — and ZERO sessions say so in
 // their title. The densest one (148 mentions) is called "Let's surface the billing automations work".
 // So a thread cannot be assembled from titles or metadata. It is assembled by searching the text.
@@ -71,10 +71,10 @@ export function readHandoff(file) {
 
 // ---------------------------------------------------------------------------- the search
 // One case-insensitive scan over everything, with the term as a plain string: the caller types
-// "company brain" or "PRD-132", not a regex, and a stray bracket must not throw.
+// "csv export" or "PRD-12", not a regex, and a stray bracket must not throw.
 const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // The query is split on separators too, not only spaces: someone looking for a thread types
-// 'company-brain' as readily as 'company brain', and they are the same thread. A query of nothing
+// 'csv-export' as readily as 'csv export', and they are the same thread. A query of nothing
 // BUT separators ('---') leaves no terms, and an empty RegExp matches at every position — which on
 // 120 MB of transcripts means millions of empty matches and every file reported as a hit. Null
 // instead, and the caller returns an empty thread.

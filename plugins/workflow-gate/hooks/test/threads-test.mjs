@@ -21,7 +21,7 @@ mkdirSync(HANDOFFS, { recursive: true });
 mkdirSync(MEMORY, { recursive: true });
 mkdirSync(SESS, { recursive: true });
 
-writeFileSync(join(HANDOFFS, 'company-brain-m6-2026-07-17.md'), `# company-brain M6 — Handoff (2026-07-17) · Status: in-progress
+writeFileSync(join(HANDOFFS, 'csv-export-m6-2026-07-17.md'), `# csv-export M6 — Handoff (2026-07-17) · Status: in-progress
 
 ## Resume here
 - **Next action:** finish the TRUTH tier.
@@ -43,21 +43,21 @@ writeFileSync(join(HANDOFFS, 'gbrain_setup.md'), `# Handoff: gbrain
 - **Brain home:** PGLite local.
 
 ## Next steps
-- wire the company brain to the relayer
+- wire the csv export to the relayer
 `);
-writeFileSync(join(HANDOFFS, 'README.md'), '# Handoffs folder\n\nNot a handoff. Mentions company brain in passing.\n');
+writeFileSync(join(HANDOFFS, 'README.md'), '# Handoffs folder\n\nNot a handoff. Mentions csv export in passing.\n');
 writeFileSync(join(HANDOFFS, 'unrelated-2026-01-01.md'), '# something else — Handoff\n\n## Decisions\n- nothing to do with it\n');
 
-writeFileSync(join(MEMORY, 'project_brain.md'), '---\nname: project-brain\ndescription: the company brain substrate\nmetadata:\n  type: project\n---\n\ncompany brain notes\n');
-writeFileSync(join(MEMORY, 'MEMORY.md'), '# index — company brain company brain company brain\n');
+writeFileSync(join(MEMORY, 'project_csv.md'), '---\nname: project-csv\ndescription: the csv export substrate\nmetadata:\n  type: project\n---\n\ncsv export notes\n');
+writeFileSync(join(MEMORY, 'MEMORY.md'), '# index — csv export csv export csv export\n');
 
 const line = (o) => JSON.stringify(o) + '\n';
 writeFileSync(join(SESS, 's1.jsonl'),
-  line({ type: 'user', timestamp: '2026-07-17T09:00:00.000Z', message: { role: 'user', content: 'work on the company brain please — the company brain wiring, and the brain again' } })
+  line({ type: 'user', timestamp: '2026-07-17T09:00:00.000Z', message: { role: 'user', content: 'work on the csv export please — the csv export wiring, and the brain again' } })
   + line({ type: 'assistant', timestamp: '2026-07-17T09:05:00.000Z', message: { role: 'assistant', content: [
     { type: 'tool_use', id: 'a', name: 'Write', input: { file_path: 'C:/repo/out/brain.md' } }] } })
   + line({ type: 'assistant', timestamp: '2026-07-17T09:06:00.000Z', message: { role: 'assistant', content: [
-    { type: 'tool_use', id: 'b', name: 'Bash', input: { command: 'git commit -m "company brain wiring"' } }] } })
+    { type: 'tool_use', id: 'b', name: 'Bash', input: { command: 'git commit -m "csv export wiring"' } }] } })
   + line({ type: 'user', timestamp: '2026-07-17T09:07:00.000Z', message: { role: 'user', content: '<system-reminder>ignore me</system-reminder>' } }));
 writeFileSync(join(SESS, 's3.jsonl'),
   line({ type: 'user', timestamp: '2026-07-19T09:00:00.000Z', gitBranch: 'feat/prd-132-brain-wiring',
@@ -68,8 +68,8 @@ writeFileSync(join(SESS, 's2.jsonl'),
 const { readHandoff, searchThread, sessionDetail } = await import('../threads.mjs');
 
 // ---- handoff parsing ---------------------------------------------------------------------------
-const h = readHandoff('company-brain-m6-2026-07-17.md');
-check('the title drops the "— Handoff" suffix', h.title === 'company-brain M6', h.title);
+const h = readHandoff('csv-export-m6-2026-07-17.md');
+check('the title drops the "— Handoff" suffix', h.title === 'csv-export M6', h.title);
 check('status is read off the H1', /in-progress/.test(h.status || ''), String(h.status));
 check('the date comes from the filename', h.date === '2026-07-17' && h.dateFromFile === true, `${h.date} fromFile=${h.dateFromFile}`);
 check('decisions are kept verbatim, not summarised', /remove the vessel gate entirely/.test(h.decisions || ''));
@@ -94,7 +94,7 @@ check('a ticket is recovered from the branch name alone',
 check('…and the branch itself is recorded', !!s3 && s3.branches.includes('feat/prd-132-brain-wiring'), JSON.stringify(s3?.branches));
 
 // ---- the search --------------------------------------------------------------------------------
-const th = searchThread('company brain');
+const th = searchThread('csv export');
 check('a README in the handoffs folder is not a handoff',
   !th.handoffs.some((x) => /readme/i.test(x.file)), th.handoffs.map((x) => x.file).join(', '));
 check('an unrelated handoff is left out', !th.handoffs.some((x) => /unrelated/.test(x.file)));
@@ -104,8 +104,8 @@ check('the memory index file is excluded from memories', !th.memories.some((m) =
 check('a matching memory is found with its type', th.memories.some((m) => m.type === 'project'), JSON.stringify(th.memories));
 check('a session mentioning it 3+ times is included, one that never does is not',
   th.sessions.length === 1 && th.sessions[0].sessionId === 's1', JSON.stringify(th.sessions.map((s) => s.sessionId)));
-// "company-brain" and "company brain" are the same thread; a hyphen must not split it.
-check('the query matches across a hyphen or a dot', searchThread('company-brain').handoffs.length === 2);
+// "csv-export" and "csv export" are the same thread; a hyphen must not split it.
+check('the query matches across a hyphen or a dot', searchThread('csv-export').handoffs.length === 2);
 check('a query with regex metacharacters does not throw', searchThread('brain (v2) [x]').handoffs.length === 0);
 // A query of nothing but separators used to build `new RegExp('')`, which matches at every position:
 // every handoff, every memory and every transcript came back a hit, with millions of empty matches
@@ -120,9 +120,9 @@ for (const junk of ['---', '   -  ', '...', '___']) {
 // ---- inputs and outputs -------------------------------------------------------------------------
 const det = sessionDetail('proj', 's1');
 check('prompts are the inputs, harness turns excluded',
-  det.promptCount === 1 && /company brain please/.test(det.prompts[0].text), JSON.stringify(det.prompts));
+  det.promptCount === 1 && /csv export please/.test(det.prompts[0].text), JSON.stringify(det.prompts));
 check('written files are the outputs', det.wrote.length === 1 && det.wrote[0].path === 'C:/repo/out/brain.md', JSON.stringify(det.wrote));
-check('git commits are surfaced separately', det.gitCommands.length === 1 && /company brain wiring/.test(det.gitCommands[0]));
+check('git commits are surfaced separately', det.gitCommands.length === 1 && /csv export wiring/.test(det.gitCommands[0]));
 check('a missing session is null, not a throw', sessionDetail('proj', 'nope') === null);
 
 rmSync(T, { recursive: true, force: true });
