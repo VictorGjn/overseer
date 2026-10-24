@@ -1,0 +1,35 @@
+{
+  "name": "workflow-gate-terminal",
+  "version": "0.2.0",
+  "description": "workflow-gate in the terminal: see the plan, change model tiers, approve, watch the run live. Records approvals through the installed workflow-gate plugin.",
+  "author": {
+    "name": "Victor Grosjean"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "teamHistory": {
+      "type": "string",
+      "title": "Team history",
+      "description": "read pulls the team's lessons on designing workflows (structure, model tiers, missions, verification, cost) into every plan review; share also pushes the lessons your retros draw — never about your project: retros, step verdicts, the bandit and rewritten missions stay on your machine; off does neither.",
+      "default": "off",
+      "options": [
+        "off",
+        "read",
+        "share"
+      ]
+    },
+    "teamHistoryRemote": {
+      "type": "string",
+      "title": "Team history repo",
+      "description": "Git remote holding the shared learnings. Empty by default: with no remote, team history stays off whatever you choose above.",
+      "default": ""
+    },
+    "teamHistoryBranch": {
+      "type": "string",
+      "title": "Team history branch",
+      "description": "Branch of that repo, one JSON file of workflow-design lessons per run under each author's folder.",
+      "default": "workflow-history"
+    }
+  }
+}

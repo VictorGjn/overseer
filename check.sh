@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate and test both plugins, then type-check overseer against the types Claude Code generates. Exit 0 = everything holds.
+# Validate and test the three plugins, then type-check overseer against the types Claude Code generates. Exit 0 = everything holds.
 #   UPDATE_GOLDEN=1 ./check.sh        rewrite the reference screens a test found changed
 #   OVERSEER_DENYLIST=<file> ./check.sh   also scan for the names in that file (keep the file outside the repo)
 set -uo pipefail
@@ -16,19 +16,21 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/overseer-check.XXXXXX"); trap 'rm -rf "$tmp"' E
 export CLAUDE_CONFIG_DIR="$tmp/cfg" CHECK_STUCK_DIR="$tmp/stuck"; mkdir -p "$CLAUDE_CONFIG_DIR"
 command -v claude >/dev/null || { echo 'claude ✘ the claude command is not on PATH'; exit 1; }
 
-# The shared files (band.tsx, kit/*) are frozen: overseer's copies must match the committed list, byte for byte, and nothing else may sit in kit/.
-set_=$(cd plugins/overseer/hooks && { echo band.tsx; find kit -type f ! -name .DS_Store; } | sort)
-[ "$set_" = "$(awk '{print $2}' kit.sha256 | sort)" ] || { echo "shared ✘ plugins/overseer/hooks: the file set differs from kit.sha256"; fail=1; }
-if (cd plugins/overseer/hooks && shasum -a 256 -c ../../../kit.sha256 >/dev/null 2>&1); then [ $fail -eq 0 ] && echo "shared ✔ band.tsx and kit/* match kit.sha256 ($(wc -l < kit.sha256 | tr -d ' ') files)"
-else echo "shared ✘ band.tsx or kit/* differ from kit.sha256 (they are frozen: restore them)"; fail=1; fi
+# The shared files (band.tsx, kit/*) are frozen: the copies of overseer and of workflow-gate-terminal must match the committed list, byte for byte, and nothing else may sit in kit/.
+for m in plugins/overseer plugins/workflow-gate-terminal; do
+  set_=$(cd $m/hooks && { echo band.tsx; find kit -type f ! -name .DS_Store; } | sort)
+  [ "$set_" = "$(awk '{print $2}' kit.sha256 | sort)" ] || { echo "shared ✘ $m/hooks: the file set differs from kit.sha256"; fail=1; }
+  if (cd $m/hooks && shasum -a 256 -c ../../../kit.sha256 >/dev/null 2>&1); then echo "shared ✔ $m: band.tsx and kit/* match kit.sha256 ($(wc -l < kit.sha256 | tr -d ' ') files)"
+  else echo "shared ✘ $m: band.tsx or kit/* differ from kit.sha256 (they are frozen: restore them)"; fail=1; fi
+done
 
-# Both plugins and the marketplace validate.
-for m in . plugins/overseer plugins/workflow-gate; do
+# The three plugins and the marketplace validate.
+for m in . plugins/overseer plugins/workflow-gate plugins/workflow-gate-terminal; do
   if claude plugin validate "$m" >/dev/null 2>&1; then echo "validate ✔ $m"; else echo "validate ✘ $m"; fail=1; fi
 done
 
-# overseer: its hooks module tests (claude plugin test). A test that finds a reference screen changed prints the new copy between GOLDEN-BEGIN/END markers (a test has no fs).
-m=plugins/overseer
+# overseer and workflow-gate-terminal: their hooks module tests (claude plugin test). A test that finds a reference screen changed prints the new copy between GOLDEN-BEGIN/END markers (a test has no fs).
+for m in plugins/overseer plugins/workflow-gate-terminal; do
 out=$(./check-watch.sh "$m" claude plugin test "$m" 2>&1); code=$?
 if grep -q 'GOLDEN-BEGIN ' <<<"$out"; then
   if [ "${UPDATE_GOLDEN:-}" = 1 ]; then
@@ -43,6 +45,7 @@ fi
 t=$(grep -Eo '[0-9]+ pass' <<<"$out" | tail -1)
 [ $code -eq 0 ] || { fail=1; t="${t:-0 pass} ✘ $(grep -Eo '[0-9]+ fail' <<<"$out" | tail -1)"; grep -E '^\(fail\)' <<<"$out" | head -10; }
 printf '%-24s %s\n' "$m" "plugin test  ${t:-no tests}"
+done
 
 # workflow-gate: plain Node tests (hooks/test/*-test.mjs, no engine). They need acorn, installed once beside them (gitignored).
 wg=plugins/workflow-gate/hooks/test

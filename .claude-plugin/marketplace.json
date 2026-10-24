@@ -1,8 +1,10 @@
 {
   "name": "overseer",
-  "owner": { "name": "Victor Grosjean" },
+  "owner": {
+    "name": "Victor Grosjean"
+  },
   "metadata": {
-    "description": "Overseer: run a PLAN.md through your Claude sessions, with a human-approved gate for Workflow runs.",
+    "description": "Overseer runs a PLAN.md through your Claude sessions. The workflow gate asks a human to approve each Workflow plan, in the browser or in the terminal.",
     "version": "0.4.2"
   },
   "plugins": [
@@ -11,18 +13,49 @@
       "source": "./plugins/overseer",
       "description": "/oversee runs the project's PLAN.md through the Claude sessions you pick: tasks, judging, weekly-limit budget, answers, nudges.",
       "version": "0.4.2",
-      "author": { "name": "Victor Grosjean" },
+      "author": {
+        "name": "Victor Grosjean"
+      },
       "category": "development",
-      "keywords": ["plan", "sessions", "board", "overseer"]
+      "keywords": [
+        "plan",
+        "sessions",
+        "board",
+        "overseer"
+      ]
     },
     {
       "name": "workflow-gate",
       "source": "./plugins/workflow-gate",
       "description": "Requires a human-approved plan before Claude Code's Workflow tool runs, plus the workflow-orchestration-patterns skill.",
       "version": "1.9.0",
-      "author": { "name": "Victor Grosjean" },
+      "author": {
+        "name": "Victor Grosjean"
+      },
       "category": "development",
-      "keywords": ["workflow", "multi-agent", "cost-control", "review-gate"]
+      "keywords": [
+        "workflow",
+        "multi-agent",
+        "cost-control",
+        "review-gate"
+      ]
+    },
+    {
+      "name": "workflow-gate-terminal",
+      "source": "./plugins/workflow-gate-terminal",
+      "description": "workflow-gate in the terminal: see the plan, change the model and effort of each agent, approve, watch the run live, and learn from each run. Records approvals through the workflow-gate plugin.",
+      "version": "0.2.0",
+      "author": {
+        "name": "Victor Grosjean"
+      },
+      "category": "development",
+      "keywords": [
+        "workflow",
+        "multi-agent",
+        "terminal",
+        "cost-control",
+        "review-gate"
+      ]
     }
   ]
 }
