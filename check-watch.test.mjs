@@ -35,7 +35,7 @@ test('a fake hung file: the diagnostic (file, CPU, child processes), written whe
   assert.match(r.err, /stopped after 0m05: it did not end\./)
   assert.deepEqual(r.left, []) // nothing left for the overseer to read once it is stopped
   assert.ok(Date.now() - t0 < 12000)
-  assert.equal(spawnSync('pgrep', ['-f', 'sleep 60']).stdout.toString().trim(), '') // the process is gone
+  assert.equal(spawnSync('pgrep', ['-f', '^sleep 60$']).stdout.toString().trim(), '') // the process is gone
 })
 
 test('a slow file that uses CPU does not fail before the limit, and says it is working', async () => {
